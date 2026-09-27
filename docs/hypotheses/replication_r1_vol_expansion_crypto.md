@@ -1,9 +1,13 @@
 # Replication R1: Volatility Expansion v1 (long) on the broker crypto universe
 
-Status: **DRAFT**, awaiting (a) the pending decisions below and (b) the broker
-contract specifications. **No historical data for any replication symbol has
-been exported or inspected.** The spec is frozen before any export; the
-freeze commit must precede every data commit for these symbols.
+Status: **FROZEN** (all choices). Draft `4bb951a`; decisions D1 = keep and
+D2 = yes made by the account owner on 2026-09-27.
+
+- Instrument metadata values (spreads, swaps, contract details) are **facts to
+  record under the fixed rules below**, not choices. They must be recorded in
+  a commit **before any strategy computation** on replication symbols.
+- Any change to a rule requires a v2.
+- See "Data intake log" for exports received before this freeze.
 
 ## Purpose
 
@@ -34,9 +38,16 @@ MATICUSD.m.
 A symbol is eligible if and only if **all** of the following hold:
 
 1. It appears in the captured list above.
-2. **PENDING DECISION D1:** its base asset is not BTC (the discovery asset).
-   - If adopted: excludes BTCUSD, BTCEUR, BTCGBP, BTCJPY, BTCXAU (15 candidates).
-   - If rejected: excludes BTCUSD only (19 candidates).
+2. It is not BTCUSD.m, the discovery symbol. **Decision D1 = keep:** BTC
+   cross pairs (BTCEUR, BTCGBP, BTCJPY, BTCXAU) remain eligible, giving 19
+   candidates.
+
+   *Recorded dissent:* the crosses are BTC priced in other currencies over
+   the discovery period, with ~95%+ correlated hourly moves. If they pass,
+   the pooled result partly re-tests the discovery data. The research log
+   must report the primary result both as specified and, descriptively,
+   without the four crosses. The descriptive version has no qualification
+   role.
 3. Its MT5 H1 export passes `qfx.backtest.mt5.load_mt5` with exactly the
    BTCUSD settings: server timezone Europe/Athens, interval 1h, max gap 4 days,
    D1-prefix trimming, Gate 0 unchanged.
@@ -82,10 +93,15 @@ the recorded value is the one QF-X uses.
 ## Walk-forward
 
 - Window lengths unchanged: 24M train, 6M validation, 6M test, 6M step.
-- **PENDING DECISION D2:** a common origin of 2021-01-01 00:00 UTC for every
+- **Decision D2 = yes:** a common origin of 2021-01-01 00:00 UTC for every
   eligible coin, so that test windows are identical calendar periods across
-  coins and can be pooled window by window. (Prior runs used each
-  instrument's own first bar.)
+  coins and can be pooled window by window. This differs from prior runs,
+  which used each instrument's own first bar; recorded as a procedural difference.
+- **Data start:** bars before 2021-01-01 00:00 UTC are discarded after
+  eligibility is checked.
+- **Data end:** each eligible coin is truncated at the earliest last-bar
+  timestamp across all eligible coins, so every coin covers the same span.
+  The v1 partial-final-window rule (>= 50% test coverage) is unchanged.
 - Parameter selection **per coin**, exactly as v1: train screen, validation
   selection, deployed and forced tracks. No pooling of parameters across coins.
 
@@ -142,6 +158,40 @@ timestamp-block randomization:
 5. **Statistic.** Each repetition's control trades from all coins are pooled
    into the same pooled statistic as the observed result.
 
+## Data intake log
+
+Exports received **before** this freeze commit, in two uploads on 2026-09-27.
+The eligibility rule (conditions 3-4) was already committed in the draft
+`4bb951a` before any file arrived.
+
+Inspection so far was limited to the header and the first and last timestamp
+of each file. No prices, returns or signals were read. Gate 0 has not been
+run. The files are not committed; hashes are recorded here.
+
+| file | sha256 | first bar (server) | condition 4 |
+|---|---|---|---|
+| ETHUSD.m_H1_202101010000_202609270000.csv | `bc251b7f0cfabd762f0b2bfd5dd71aab5850a90920fb8bfe674584cc888dfc12` | 2021-01-01 00:00 | passes (Gate 0 pending) |
+| LTCUSD.m_H1_202101010000_202609270000.csv | `c9119d5d28d4c28e64d81d5ec3504cfc96cd6038f32abc4fc18accd4969891df` | 2021-01-01 00:00 | passes (Gate 0 pending) |
+| XRPUSD.m_H1_202101010000_202609270000.csv | `985fa84fb00e602d631d8323b60ff6aa83868dcd8285e199a9112c6021744e10` | 2021-01-01 00:00 | passes (Gate 0 pending) |
+| ADAUSD.m_H1_202206200000_202609270000.csv | `8348ce2c1b3cfdf1b679d6cf02460c01c5c267b30ce83e23342da8fac85e294c` | 2022-06-20 00:00 | **fails: ineligible** |
+| DOTUSD.m_H1_202206200000_202609270000.csv | `40450db1196c3447297615cebafc1ade4b75110b380f7ad9d843d2fc72e8bac3` | 2022-06-20 00:00 | **fails: ineligible** |
+| XLMUSD.m_H1_202206200000_202609270000.csv | `e90aa2dbe803b5291aa5ac95ae0d960d67b06cc7faf2ec2551629516003f60e7` | 2022-06-20 00:00 | **fails: ineligible** |
+| SOLUSD.m_H1_202208150000_202609270000.csv | `9c3a1b9da48e71a7406dc3bbe57220577b87932e7eda8203deea058703e418f2` | 2022-08-15 00:00 | **fails: ineligible** |
+| KSMUSD.m_H1_202208150000_202609270000.csv | `80035fd405d9a6715ee9efbf9f6d93e855839fa21bc7c9562d54b98cad8c9844` | 2022-08-15 00:00 | **fails: ineligible** |
+| TRXUSD.m_H1_202402061100_202609270000.csv | `082f35094a5a932ea6fd5c275bb59b0b6be4f2e6a2bdd0f3c577235978b7a33c` | 2024-02-06 11:00 | **fails: ineligible** |
+
+Not yet received: BCHUSD.m, UNIUSD.m, BTCEUR.m, BTCGBP.m, BTCJPY.m, BTCXAU.m,
+AVAXUSD.m, DOGEUSD.m, LINKUSD.m, MATICUSD.m.
+
+**Export instruction for the remaining symbols:** export H1 from the earliest
+date the terminal offers (not from 2021-01-01), so that condition 4 is tested
+against the broker's full history and not against the chosen export start.
+
+**Caveat on the three passing files:** they were exported starting exactly
+at 2021-01-01 00:00 server time (= 2020-12-31 22:00 UTC), which satisfies
+condition 4 by 2 hours. It shows the broker has H1 history at least that far
+back. Whether it goes further back does not affect eligibility.
+
 ## Explicitly forbidden
 
 - New parameter grid, compression threshold or lookback.
@@ -153,7 +203,9 @@ timestamp-block randomization:
 ## Checkpoints (each one a separate commit)
 
 1. **This draft:** universe captured and screenshot hashed.
-2. Contract specifications recorded, decisions D1 and D2 made, then **FREEZE**.
+2. **FREEZE** (this commit): decisions D1/D2 made, intake log recorded.
+   Then contract specifications are recorded in a separate commit, before
+   step 4.
 3. Export H1 data for the captured symbols, run Gate 0, apply the eligibility
    rule, and commit the eligibility report before any strategy code runs on
    these symbols.
@@ -167,7 +219,7 @@ timestamp-block randomization:
 {
   "name": "replication_r1_vol_expansion_crypto",
   "version": 1,
-  "status": "draft",
+  "status": "frozen",
   "hypothesis": {"spec": "volatility_expansion_v1", "frozen_commit": "5feeb35", "direction": "long"},
   "universe_capture": {
     "date": "2026-09-27",
@@ -178,15 +230,18 @@ timestamp-block randomization:
   },
   "eligibility": {
     "exclude_discovery_symbol": "BTCUSD.m",
-    "exclude_btc_base_asset": "PENDING_D1",
+    "exclude_btc_base_asset": false,
+    "descriptive_without_btc_crosses": true,
     "loader": {"tz": "Europe/Athens", "interval_hours": 1, "max_gap_days": 4, "trim_d1_prefix": true},
     "first_h1_at_or_before": "2021-01-01T00:00:00Z",
     "last_h1_at_or_after": "2026-08-24T00:00:00Z",
+    "data_start": "2021-01-01T00:00:00Z",
+    "data_end": "earliest_last_bar_across_eligible_coins",
     "minimum_n": null
   },
   "costs": {"spread_floor": "quoted_at_capture", "slippage_ratio_of_floor": 0.16666666666666666,
             "financing": "recorded_long_swap_per_rollover", "stress_multiplier_includes_financing": true},
-  "walkforward": {"windows": "unchanged", "common_origin": "PENDING_D2", "selection": "per_coin_as_v1"},
+  "walkforward": {"windows": "unchanged", "common_origin": "2021-01-01T00:00:00Z", "selection": "per_coin_as_v1"},
   "primary": {"statistic": "pooled_mean_net_bps_after_financing", "clustered_t_min": 2.0,
               "cluster": "utc_entry_day", "drift_max_p": 0.05, "existing_walkforward_rules": "all"},
   "drift_control": {"spec": "drift_baseline_v1", "randomization_unit": "signal_timestamp_group",
