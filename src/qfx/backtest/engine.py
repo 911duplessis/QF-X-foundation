@@ -56,11 +56,14 @@ def _spread(bar: Bar, costs: ExecutionCosts) -> float:
     return max(bar.spread, costs.spread) if bar.spread is not None else costs.spread
 
 
-def _close(held_side: Side, entry_bar: Bar, entry: float, exit_bar: Bar, exit_mid: float, costs: ExecutionCosts) -> Trade:
+def _close(held_side: Side, entry_bar: Bar, entry: float, exit_bar: Bar, exit_mid: float, costs: ExecutionCosts, reason: str = "signal") -> Trade:
     exit = execution_price(exit_mid, _opposite(held_side), _spread(exit_bar, costs), costs.slippage)
     gross = (exit - entry) if held_side is Side.LONG else (entry - exit)
     total_cost = trade_cost(entry, exit, costs)
-    return Trade(held_side, entry_bar.timestamp, exit_bar.timestamp, entry, exit, gross, total_cost, gross - total_cost)
+    return Trade(
+        held_side, entry_bar.timestamp, exit_bar.timestamp, entry, exit, gross, total_cost, gross - total_cost,
+        mid_entry=entry_bar.open, mid_exit=exit_mid, exit_reason=reason,
+    )
 
 
 def run_backtest(bars: Sequence[Bar], signal: Signal, *, costs: ExecutionCosts | None = None) -> list[Trade]:
@@ -99,6 +102,6 @@ def run_backtest(bars: Sequence[Bar], signal: Signal, *, costs: ExecutionCosts |
     if position is not None:
         held_side, entry_index, entry = position
         last = bars[-1]
-        trades.append(_close(held_side, bars[entry_index], entry, last, last.close, costs))
+        trades.append(_close(held_side, bars[entry_index], entry, last, last.close, costs, "end_of_data"))
 
     return trades
