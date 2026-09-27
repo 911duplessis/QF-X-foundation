@@ -38,6 +38,7 @@ The objective is not maximum trade frequency. The objective is a repeatable cond
 | `risk` | Hard limits and kill switches; correlated exposure shares the open-risk limit |
 | `backtest` | Gate 2 harness: delayed fills, per-bar spread (floor), commission, slippage; no look-ahead |
 | `backtest.mt5` | MT5 export loader: server time -> UTC, spread points -> price, D1 prefix trimming, Gate 0 |
+| `research` | Causal features, chronological splits, hypotheses, baseline experiment with qualification rule |
 | `pipeline` | DATA QUALITY -> REGIME -> VOLATILITY -> EDGE -> RISK -> research decision (default NO_TRADE) |
 
 Run tests: `pip install -e .[test] && pytest`
@@ -54,6 +55,10 @@ Verified properties of these exports:
 - Each file begins with ~7-10 months of D1 bars before H1 history starts; the loader trims and reports them.
 - BTCUSD (24/7) has one ambiguous bar per spring DST switch; the loader drops it and reports the count.
 - `<SPREAD>` is the bar's quoted spread in points; the engine uses it only as a floor above the configured spread.
+
+## Research results
+
+- [Baseline: trend continuation (H1)](docs/results/baseline_trend_continuation.md): **no qualified edge** on EURUSD, XAUUSD or BTCUSD. Reproduce with `python -m qfx.research.baseline --report docs/results/baseline_trend_continuation.md`.
 
 ## Design principle
 
