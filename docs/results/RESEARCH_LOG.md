@@ -3,11 +3,34 @@
 Interpretation of generated results. Files in this directory ending in `.md`/`.json`
 next to an experiment are generated and must not be hand-edited; conclusions live here.
 
-Research sequence: rolling walk-forward -> trend continuation -> liquidity sweep/reversal
+Research sequence: rolling walk-forward (done) -> trend continuation (no demonstrated edge) -> liquidity sweep/reversal (no demonstrated edge)
 -> volatility expansion -> regime-conditional combinations -> meta-engine
 -> portfolio/correlation -> shadow trading. No execution layer before shadow trading passes.
 
 Language rule: results say "no demonstrated edge", never "does not work".
+
+## 2026-09 - Walk-forward: Liquidity Sweep Reversal v1 (H1)
+
+Specification frozen before implementation: [liquidity_sweep_reversal_v1.md](../hypotheses/liquidity_sweep_reversal_v1.md) (commit `604f63a`); code committed before the first run.
+Reports: [long](walkforward_sweep_reversal_long.md) ([json](walkforward_sweep_reversal_long.json)) · [short](walkforward_sweep_reversal_short.md) ([json](walkforward_sweep_reversal_short.json))
+
+**Verdict: no demonstrated edge in either direction on any instrument, deployed or forced.** Directions reported separately, as specified.
+
+| direction | symbol | forced: profitable windows | forced test trades | net bps/trade | t | avg R | upper bound (mean + 2 SE, bps) | deployed |
+|---|---|---|---|---|---|---|---|---|
+| long (sell-side sweep) | BTCUSD | 2/6 | 285 | -13.9 | -1.27 | -0.14 | +8.0 | traded 3/6 windows, 171 trades, -23.2 bps |
+| long (sell-side sweep) | EURUSD | 3/7 | 329 | -1.6 | -1.21 | -0.10 | +1.0 | traded 5/7 windows, 226 trades, -2.2 bps |
+| long (sell-side sweep) | XAUUSD | 2/7 | 255 | -0.2 | -0.03 | +0.06 | +11.3 | traded 3/7 windows, 82 trades, -13.0 bps |
+| short (buy-side sweep) | BTCUSD | 3/6 | 498 | -1.7 | -0.30 | -0.08 | +9.9 | abstained in all 6 |
+| short (buy-side sweep) | EURUSD | 0/7 | 482 | -1.9 | -1.70 | -0.14 | +0.3 | abstained in all 7 |
+| short (buy-side sweep) | XAUUSD | 2/7 | 450 | -3.1 | -1.41 | -0.10 | +1.3 | abstained in all 7 |
+
+- **Sample size problem largely solved for this hypothesis.** 255-498 forced out-of-sample trades per instrument and direction (2.5-5x the trend run) make the result informative: on EURUSD any edge in either direction is bounded at about +1 bps per trade, below its ~1.3 bps round-trip cost. On XAUUSD shorts the bound is +1.3 bps. BTC and XAU longs remain wide (+8 to +11 bps) because per-trade dispersion is larger.
+- **Mechanics verified on real trades.** Stop exits average -1.03 to -1.05 R (1 R plus costs), 2R targets +1.95 to +1.97 R; the worst trade (-4.2 R, XAUUSD) is a gap through the stop filled at the open, as specified. The cost gate removed ~42% of BTC setups (2021-22 spread era) and <3% elsewhere.
+- **Direction asymmetry is in-sample only.** Short candidates almost never pass the train screen (deployed abstains everywhere); long candidates pass with small margins (+0.4 to +10 bps) and then fail out of sample. The likely explanation is market drift, not sweep structure: gold and BTC rose strongly over 2020-2026, so any long-only rule earns drift in train. Not tested; see next step.
+- **The deployed track behaved correctly.** Every window where it traded shorts would have been a train-screen failure; the forced track confirms those would have lost (all three short pooled results negative).
+
+**Candidate next control (not yet run, must be specified before running):** a drift baseline, meaning random-timed entries with identical brackets and holding rules, per direction. Any future directional hypothesis should be judged against it rather than against zero.
 
 ## 2026-09 - Walk-forward: trend continuation (H1)
 
