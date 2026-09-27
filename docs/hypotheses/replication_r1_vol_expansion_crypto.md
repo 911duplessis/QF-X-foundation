@@ -1,7 +1,13 @@
 # Replication R1: Volatility Expansion v1 (long) on the broker crypto universe
 
-Status: **FROZEN** (all choices). Draft `4bb951a`; decisions D1 = keep and
-D2 = yes made by the account owner on 2026-09-27.
+Status: **FROZEN, version 2**. Draft `4bb951a`; v1 frozen `28fe237`
+(D1 = keep, D2 = yes). **v2 amendment (2026-09-27): D1 reversed to exclude
+BTC-base symbols** by the account owner. When the amendment was made:
+- no data for any BTC cross pair had been received;
+- no strategy result existed for any replication symbol;
+- inspection of any symbol was limited to the intake log below.
+
+The reversal therefore cannot be result-driven. v1 remains in git history.
 
 - Instrument metadata values (spreads, swaps, contract details) are **facts to
   record under the fixed rules below**, not choices. They must be recorded in
@@ -38,16 +44,12 @@ MATICUSD.m.
 A symbol is eligible if and only if **all** of the following hold:
 
 1. It appears in the captured list above.
-2. It is not BTCUSD.m, the discovery symbol. **Decision D1 = keep:** BTC
-   cross pairs (BTCEUR, BTCGBP, BTCJPY, BTCXAU) remain eligible, giving 19
-   candidates.
-
-   *Recorded dissent:* the crosses are BTC priced in other currencies over
-   the discovery period, with ~95%+ correlated hourly moves. If they pass,
-   the pooled result partly re-tests the discovery data. The research log
-   must report the primary result both as specified and, descriptively,
-   without the four crosses. The descriptive version has no qualification
-   role.
+2. Its base asset is not BTC, the discovery asset. **D1 = exclude (v2):**
+   BTCUSD.m (discovery symbol), BTCEUR.m, BTCGBP.m, BTCJPY.m and BTCXAU.m are
+   excluded, leaving 15 candidates. Reason: the crosses are BTC priced in
+   other currencies over the discovery period (~95%+ correlated hourly
+   moves), so including them would partly re-test the discovery data. They
+   need not be exported.
 3. Its MT5 H1 export passes `qfx.backtest.mt5.load_mt5` with exactly the
    BTCUSD settings: server timezone Europe/Athens, interval 1h, max gap 4 days,
    D1-prefix trimming, Gate 0 unchanged.
@@ -73,6 +75,37 @@ the recorded value is the one QF-X uses.
 | rollover time, triple-swap day, whether swaps apply on weekends | financing |
 | trading hours / sessions | Gate 0 gap interpretation |
 | first and last available H1 timestamp (from the export, not the spec) | eligibility |
+
+## Quoted spreads at capture (spread floors)
+
+Source: 15 MT5 Market Watch bid/ask snapshots, 2026-09-27 11:35-11:42 server
+time, stored at `assets/replication_r1_market_watch_quotes_2026-09-27.zip`
+(sha256 `88309d2a158b9535126327bdef2199cfc9561094d5007cb2b2aa04ea5a545135`).
+
+- **Measurement rule (fixed in v2):** spread floor = median of (ask - bid)
+  over all snapshots that contain the symbol.
+- The capture was on a Sunday. Weekend crypto spreads are usually wider, so
+  these floors are conservative; per-bar MT5 spreads still apply when wider.
+- High-spread symbols (e.g. LTC, XRP) are **not** excluded. The frozen cost
+  gate (spread <= 0.25 x stop distance) decides trade by trade.
+
+| symbol | spread floor (price units) | bps at capture | snapshots |
+|---|---|---|---|
+| BCHUSD.m | 0.8 | 23.3 | 2 |
+| ETHUSD.m | 1.4 | 5.2 | 15 |
+| LTCUSD.m | 1.43 | 198.7 | 15 |
+| XRPUSD.m | 0.01 | 65.1 | 15 |
+| ADAUSD.m | 0.0007 | 27.2 | 15 |
+| DOTUSD.m | 0.005 | 39.9 | 15 |
+| XLMUSD.m | 0.0004 | 18.3 | 15 |
+| KSMUSD.m | 0.05 | 101.3 | 15 |
+| SOLUSD.m | 0.21 | 16.9 | 15 |
+| TRXUSD.m | 0.00058 | 17.4 | 15 |
+| UNIUSD.m | 0.0101 | 10.1 | 15 |
+| AVAXUSD.m | 0.0242 | 21.8 | 15 |
+| DOGEUSD.m | 0.00024 | 24.5 | 15 |
+| LINKUSD.m | 0.02 | 13.9 | 15 |
+| MATICUSD.m | 0.0006 | 49.9 | 15 |
 
 ## Costs (rule-based, fixed before data)
 
@@ -180,8 +213,8 @@ run. The files are not committed; hashes are recorded here.
 | KSMUSD.m_H1_202208150000_202609270000.csv | `80035fd405d9a6715ee9efbf9f6d93e855839fa21bc7c9562d54b98cad8c9844` | 2022-08-15 00:00 | **fails: ineligible** |
 | TRXUSD.m_H1_202402061100_202609270000.csv | `082f35094a5a932ea6fd5c275bb59b0b6be4f2e6a2bdd0f3c577235978b7a33c` | 2024-02-06 11:00 | **fails: ineligible** |
 
-Not yet received: BCHUSD.m, UNIUSD.m, BTCEUR.m, BTCGBP.m, BTCJPY.m, BTCXAU.m,
-AVAXUSD.m, DOGEUSD.m, LINKUSD.m, MATICUSD.m.
+Not yet received (v2 universe): BCHUSD.m, UNIUSD.m, AVAXUSD.m, DOGEUSD.m,
+LINKUSD.m, MATICUSD.m. BTC cross pairs are no longer needed.
 
 **Export instruction for the remaining symbols:** export H1 from the earliest
 date the terminal offers (not from 2021-01-01), so that condition 4 is tested
@@ -218,8 +251,10 @@ back. Whether it goes further back does not affect eligibility.
 ```json
 {
   "name": "replication_r1_vol_expansion_crypto",
-  "version": 1,
+  "version": 2,
   "status": "frozen",
+  "amendments": [{"version": 2, "date": "2026-09-27", "change": "D1 reversed: exclude BTC-base symbols",
+                  "made_before": "any BTC-cross data and any replication result"}],
   "hypothesis": {"spec": "volatility_expansion_v1", "frozen_commit": "5feeb35", "direction": "long"},
   "universe_capture": {
     "date": "2026-09-27",
@@ -230,8 +265,8 @@ back. Whether it goes further back does not affect eligibility.
   },
   "eligibility": {
     "exclude_discovery_symbol": "BTCUSD.m",
-    "exclude_btc_base_asset": false,
-    "descriptive_without_btc_crosses": true,
+    "exclude_btc_base_asset": true,
+    "candidates": ["BCHUSD.m", "ETHUSD.m", "LTCUSD.m", "XRPUSD.m", "ADAUSD.m", "DOTUSD.m", "XLMUSD.m", "KSMUSD.m", "SOLUSD.m", "TRXUSD.m", "UNIUSD.m", "AVAXUSD.m", "DOGEUSD.m", "LINKUSD.m", "MATICUSD.m"],
     "loader": {"tz": "Europe/Athens", "interval_hours": 1, "max_gap_days": 4, "trim_d1_prefix": true},
     "first_h1_at_or_before": "2021-01-01T00:00:00Z",
     "last_h1_at_or_after": "2026-08-24T00:00:00Z",
@@ -239,7 +274,8 @@ back. Whether it goes further back does not affect eligibility.
     "data_end": "earliest_last_bar_across_eligible_coins",
     "minimum_n": null
   },
-  "costs": {"spread_floor": "quoted_at_capture", "slippage_ratio_of_floor": 0.16666666666666666,
+  "costs": {"spread_floor": "median_quoted_spread_across_market_watch_snapshots",
+            "spread_floor_values": {"BCHUSD.m": 0.8000000000000114, "ETHUSD.m": 1.400000000000091, "LTCUSD.m": 1.4300000000000068, "XRPUSD.m": 0.010000000000000009, "ADAUSD.m": 0.0007000000000000339, "DOTUSD.m": 0.0050000000000001155, "XLMUSD.m": 0.0003999999999999837, "KSMUSD.m": 0.04999999999999982, "SOLUSD.m": 0.20999999999999375, "TRXUSD.m": 0.0005800000000000249, "UNIUSD.m": 0.010099999999999554, "AVAXUSD.m": 0.024200000000000443, "DOGEUSD.m": 0.0002400000000000041, "LINKUSD.m": 0.019999999999999574, "MATICUSD.m": 0.0005999999999999894}, "slippage_ratio_of_floor": 0.16666666666666666,
             "financing": "recorded_long_swap_per_rollover", "stress_multiplier_includes_financing": true},
   "walkforward": {"windows": "unchanged", "common_origin": "2021-01-01T00:00:00Z", "selection": "per_coin_as_v1"},
   "primary": {"statistic": "pooled_mean_net_bps_after_financing", "clustered_t_min": 2.0,
