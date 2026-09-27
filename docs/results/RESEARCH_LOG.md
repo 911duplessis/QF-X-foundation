@@ -5,12 +5,60 @@ next to an experiment are generated and must not be hand-edited; conclusions liv
 
 Research sequence: rolling walk-forward (done) -> trend continuation (no demonstrated edge) -> liquidity sweep/reversal (no demonstrated edge; no timing edge vs drift baseline) -> volatility expansion (not qualified) -> Replication R1 of the BTCUSD long candidate (not replicated; candidate closed)
 -> FX Session Directional Persistence v1 on seven USD majors (not qualified; no demonstrated edge)
+-> USDJPY Gotobi-Day Tokyo Fix v2 (not qualified; no demonstrated edge)
 -> volatility expansion -> regime-conditional combinations -> meta-engine
 -> portfolio/correlation -> shadow trading. No execution layer before shadow trading passes.
 
 Language rule: results say "no demonstrated edge", never "does not work".
 
-Every primary test is also listed in the [test ledger](../hypotheses/TEST_LEDGER.md) (17 tests, 0 qualified). A new pre-registration must include a ledger section: overlap, family size and multiplicity handling.
+Every primary test is also listed in the [test ledger](../hypotheses/TEST_LEDGER.md) (18 tests, 0 qualified). A new pre-registration must include a ledger section: overlap, family size and multiplicity handling.
+
+## 2026-09 - USDJPY Gotobi-Day Tokyo Fix v2 (mechanism-first, parameter-free)
+
+Report: [usdjpy_gotobi_v1.md](usdjpy_gotobi_v1.md) (+ `.json`). Ledger test 18.
+
+Pre-registration trail:
+
+| commit | step |
+|---|---|
+| `f1c1cfb` | shortlist |
+| `6c4135d` | v1 freeze |
+| `22931f9` | v1 code |
+| `5809637` | CSV installed; sha256 matched the quarantine record |
+| `7c909bd` | v1 stopped at Gate 0: H1 only from 2019-06-07, earlier bars daily; 104-day gap. Diagnosed from timestamps only, no price read |
+| `30d60f2` | **v2 freeze** (option A, approved before any price was read) |
+| `0ed2745` | v2 code |
+
+The result was then run once. A JSON-serialization fix followed; the rerun report is byte-identical.
+
+**Verdict: NOT QUALIFIED. No demonstrated edge.** Every gate fails, and the sign is wrong:
+
+| gate (need) | result |
+|---|---|
+| net > 0, t >= 2.28 | **-3.03 bps, t -5.07** (493 trades) |
+| gotobi - placebo gross > 0, Welch t >= 2.28 | **-1.13 bps, t -1.59** (gotobi gross -0.47 vs placebo +0.66) |
+| >= 5/8 years positive, median year > 0 | **0/8** positive; median -3.10 |
+| net at 2x costs > 0 | -5.59 |
+| trades >= 400 | 493 (passes) |
+
+- **No gross effect.**
+  - Gotobi-day 09:00-10:00 JST gross is -0.47 bps, below the same hour on ordinary business days (+0.66).
+  - The predicted pre-fix USD demand is not visible in this broker's H1 data, 2019-2026.
+- **The net loss is cost.**
+  - Realized round trip is about 2.6 bps, above the 2.12 bps floor. Per-bar spreads in the Tokyo-morning hour are wider than the Friday-close capture.
+  - Every year is negative by 2.4-3.7 bps, i.e. about the cost.
+  - The large negative t (-5.07) reflects a precisely measured cost drag, not a short signal. Reversing the trade would pay the spread again on a gross of about 0.5 bps.
+- **Resolution was as designed.**
+  - Per-trade sd was 13.3 bps, inside the pre-data assumption of 8-15.
+  - Achieved resolution: 1.70 bps at 2.8416 x SE, or 1.86 bps at the frozen 2.28 threshold. The design was 1.68.
+  - **Consequence:** this rules out a gotobi-hour edge of about 2 bps or more net after costs. It cannot rule out a small effect concentrated in the minutes before 09:55, which H1 bars dilute.
+- **Descriptive only:**
+  - The untouched 2019-06 to 2020 sub-period (91 trades) gives -3.22 net, and a gotobi-placebo difference of +0.04.
+  - The 30th events give -1.70 and the 5th-25th events -3.28.
+  - None of these is a lead.
+- **Process findings:**
+  1. **Export file names do not prove H1 depth.** This broker's MT5 exports back-fill older history with daily bars. The untouched-pre-2021 route (ledger option 2) is effectively closed for these symbols, and future designs must check bar resolution (timestamps only) before relying on history depth.
+  2. The Gate 0 stop worked as intended. It halted the run before any price-based computation.
 
 ## 2026-09 - FX Session Directional Persistence v1 (seven USD majors, H1)
 

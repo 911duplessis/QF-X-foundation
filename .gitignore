@@ -19,3 +19,5 @@ data/*
 !data/mt5/replication_r1/*.csv
 !data/mt5/fx_session_v1/
 !data/mt5/fx_session_v1/*.csv
+!data/mt5/gotobi_v1/
+!data/mt5/gotobi_v1/*.csv
