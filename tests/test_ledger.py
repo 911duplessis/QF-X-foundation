@@ -24,8 +24,8 @@ def drift_p(hypothesis, symbol):
 
 def test_ledger_is_complete_and_unique():
     ids = [r["id"] for r in rows()]
-    assert len(ids) == len(set(ids)) == 17
-    assert "## Tests run (17 primary tests; 0 qualified)" in LEDGER.read_text(encoding="utf-8")
+    assert len(ids) == len(set(ids)) == 18
+    assert "## Tests run (18 primary tests; 0 qualified)" in LEDGER.read_text(encoding="utf-8")
     assert sum(r["qualified"] for r in rows()) == 0
 
 
@@ -65,3 +65,15 @@ def test_fx_session_row_matches_results():
     assert row["drift_p"] == pytest.approx(res["drift"]["test"]["pooled"]["p_value"], abs=0.0005)
     assert row["design_mde_bps"] == pytest.approx(res["resolution"]["forced"], abs=0.005)
     assert len(res["grid"]) == row["grid"]
+
+
+def test_gotobi_row_matches_results():
+    (row,) = [r for r in rows() if r["id"].startswith("usdjpy_gotobi")]
+    res = json.loads((ROOT / row["result_file"]).read_text())
+    net = res["primary"]["net"]
+    assert res["qualified"] is row["qualified"] and res["spec_version"] == 2
+    assert row["forced_trades"] == net["n"]
+    assert row["forced_net_bps"] == pytest.approx(net["mean"], abs=0.005)
+    assert row["forced_t_day"] == pytest.approx(net["t"], abs=0.005)
+    assert row["placebo_welch_t"] == pytest.approx(res["primary"]["placebo_welch_t"], abs=0.005)
+    assert row["design_mde_bps"] == pytest.approx(2.8416 * net["sd"] / net["n"] ** 0.5, abs=0.005)

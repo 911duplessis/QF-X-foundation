@@ -13,7 +13,7 @@ next hypothesis is pre-registered.
   analysis, per-pair and long/short splits, financing sensitivities, the
   BTCUSD re-costing, and train/validation drift diagnostics.
 
-## Tests run (17 primary tests; 0 qualified)
+## Tests run (18 primary tests; 0 qualified)
 
 | # | test | pre-registration | qualified | forced trades | forced net bps | forced day-clustered t | drift p | resolution (bps) | grid |
 |---|---|---|---|---|---|---|---|---|---|
@@ -34,6 +34,7 @@ next hypothesis is pre-registered.
 | 15 | `vol_expansion_short:XAUUSD` | `volatility_expansion_v1.md`, frozen `5feeb35` | no | 189 | -11.69 | -2.19 | 0.836 | 15.3 | 8 |
 | 16 | `replication_r1:ETH+LTC+XRP` | `replication_r1_vol_expansion_crypto.md` v2, frozen `28fe237` / checkpoint 4 `1b6fb6e` | no | 286 | -26.27 | -1.34 | 0.327 | 55.9 | 8 |
 | 17 | `fx_session_persistence_v1:7 majors` | `fx_session_persistence_v1.md`, frozen `a624b64` | no | 1871 | -1.91 | -1.91 | 0.577 | 2.9 | 4 |
+| 18 | `usdjpy_gotobi_v2:USDJPY.m` | `usdjpy_gotobi_v1.md` v2, frozen `30d60f2` (v1 `6c4135d`, blocked at Gate 0) | no | 493 | -3.03 | -5.07 | - (placebo Welch t -1.59) | 1.7 | 1 |
 
 **Column definitions**
 - **Forced:** the forced walk-forward track (always trades the
@@ -43,12 +44,14 @@ next hypothesis is pre-registered.
     after the fact). Those tests' own qualification used the IID t.
   - Tests 16-17 used the clustered t for qualification.
 - **Drift p:** the drift control on test segments. Tests 1-3 had no drift
-  control.
+  control. Test 18 uses a same-hour placebo instead (Welch t shown).
 - **Resolution:** 2.8416 x the day-clustered SE, i.e. the smallest true
   edge per trade with 80% power to reach t >= 2.
   - Tests 1-16: from `power_analysis.json`, computed after the results.
   - Test 17: the achieved resolution. Its pre-data design MDE was 2.51 bps.
-- **Grid:** parameter cells searched per test. Selection happens inside the
+  - Test 18: 2.8416 x SE on the same basis. Its own threshold was t >= 2.28
+    (Bonferroni), so its design MDE was 1.68 bps at that threshold.
+- **Grid:** parameter cells searched per test (test 18 has none: 1). Selection happens inside the
   walk-forward, so this counts search, not additional tests.
 
 **Nominal near-misses (none qualified; listed so they cannot be re-mined)**
@@ -71,7 +74,8 @@ segments). A later test on the same series is **not** independent of these.
 | XAUUSD | 2020-10-22 to 2026-09-04 | 3, 6, 9, 12, 15 | 5 |
 | BTCUSD | 2020-12-02 to 2026-08-24 | 1, 4, 7, 10, 13 (+ R1 re-costing, descriptive) | 5 |
 | ETHUSD.m, LTCUSD.m, XRPUSD.m | 2021-01-01 to 2026-09-27 | 16 | 1 |
-| GBPUSD.m, USDJPY.m, USDCHF.m, AUDUSD.m, USDCAD.m, NZDUSD.m | 2021-01-04 to 2026-09-25 | 17 | 1 |
+| GBPUSD.m, USDCHF.m, AUDUSD.m, USDCAD.m, NZDUSD.m | 2021-01-04 to 2026-09-25 | 17 | 1 |
+| USDJPY.m | 2019-06-07 to 2026-09-25 (H1; the export's earlier bars are daily and were never used) | 17 (2021-2026), 18 (2019-06 to 2026, 00:00 UTC hour) | 2 |
 
 Also on record: EURUSD trend-continuation session breakdowns (disclosed in
 spec 17), and the single-split trend baseline that preceded test 1
@@ -122,6 +126,7 @@ A test with no ledger section cannot be frozen.
   {"id": "vol_expansion_short:EURUSD", "hypothesis": "vol_expansion_short", "universe": ["EURUSD"], "result_file": "docs/results/walkforward_vol_expansion_short.json", "qualified": false, "forced_trades": 207, "forced_net_bps": -1.53, "forced_t_day": -0.65, "drift_p": 0.539, "design_mde_bps": 6.7, "grid": 8},
   {"id": "vol_expansion_short:XAUUSD", "hypothesis": "vol_expansion_short", "universe": ["XAUUSD"], "result_file": "docs/results/walkforward_vol_expansion_short.json", "qualified": false, "forced_trades": 189, "forced_net_bps": -11.69, "forced_t_day": -2.19, "drift_p": 0.836, "design_mde_bps": 15.3, "grid": 8},
   {"id": "replication_r1:ETH+LTC+XRP", "hypothesis": "vol_expansion_long (replication)", "universe": ["ETHUSD.m", "LTCUSD.m", "XRPUSD.m"], "result_file": "docs/results/replication_r1.json", "qualified": false, "forced_trades": 286, "forced_net_bps": -26.27, "forced_t_day": -1.34, "drift_p": 0.327, "design_mde_bps": 55.9, "grid": 8},
-  {"id": "fx_session_persistence_v1:7 majors", "hypothesis": "fx_session_persistence", "universe": ["EURUSD.m", "GBPUSD.m", "USDJPY.m", "USDCHF.m", "AUDUSD.m", "USDCAD.m", "NZDUSD.m"], "result_file": "docs/results/fx_session_persistence_v1.json", "qualified": false, "forced_trades": 1871, "forced_net_bps": -1.91, "forced_t_day": -1.91, "drift_p": 0.577, "design_mde_bps": 2.86, "grid": 4}
+  {"id": "fx_session_persistence_v1:7 majors", "hypothesis": "fx_session_persistence", "universe": ["EURUSD.m", "GBPUSD.m", "USDJPY.m", "USDCHF.m", "AUDUSD.m", "USDCAD.m", "NZDUSD.m"], "result_file": "docs/results/fx_session_persistence_v1.json", "qualified": false, "forced_trades": 1871, "forced_net_bps": -1.91, "forced_t_day": -1.91, "drift_p": 0.577, "design_mde_bps": 2.86, "grid": 4},
+  {"id": "usdjpy_gotobi_v2:USDJPY.m", "hypothesis": "usdjpy_gotobi", "universe": ["USDJPY.m"], "result_file": "docs/results/usdjpy_gotobi_v1.json", "qualified": false, "forced_trades": 493, "forced_net_bps": -3.03, "forced_t_day": -5.07, "drift_p": null, "placebo_welch_t": -1.59, "design_mde_bps": 1.7, "grid": 1}
 ]}
 ```

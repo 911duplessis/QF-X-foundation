@@ -327,7 +327,9 @@ def render(res: dict) -> str:
 
 def results_json(res: dict) -> dict:
     def ev(e: Evaluation) -> dict:
-        return {k: v for k, v in e.__dict__.items() if k not in ("trades", "placebo", "stressed")}
+        out = {k: v for k, v in e.__dict__.items() if k not in ("trades", "placebo", "stressed")}
+        out["period"] = [d.isoformat() for d in e.period]
+        return out
     return to_jsonable({"schema_version": SCHEMA_VERSION, "spec": SPEC_PATH, "symbol": SYMBOL,
                         "qualified": res["qualified"], "failures": res["failures"],
                         "spec_version": SPEC_VERSION, "primary": ev(res["primary"]),
