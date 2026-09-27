@@ -39,6 +39,7 @@ The objective is not maximum trade frequency. The objective is a repeatable cond
 | `backtest.bracket` | Stop/target/time-stop execution: stop first on same-bar touch, gaps fill at the open, R per trade |
 | `backtest` | Gate 2 harness: delayed fills, per-bar spread (floor), commission, slippage; no look-ahead |
 | `backtest.mt5` | MT5 export loader: server time -> UTC, spread points -> price, D1 prefix trimming, Gate 0 |
+| `research.power` | Descriptive power analysis: minimum detectable edge per qualification component, reproduced from frozen code |
 | `research.replication` | Replication R1: pooled multi-coin walk-forward, day-clustered t, timestamp-block drift control, financing sensitivity (frozen spec) |
 | `backtest.financing` | Swap charges per rollover (22:00 server, weekdays, Wednesday x3) in bps |
 | `research.expansion` | Volatility Expansion v1 (compression rank + breakout), checked against its frozen specification by test |
@@ -66,6 +67,7 @@ Verified properties of these exports:
 
 Interpretation lives in the [research log](docs/results/RESEARCH_LOG.md); generated reports sit next to it.
 
+- [Power analysis](docs/results/power_analysis.md) (+ `.json`, descriptive only): smallest edge each completed experiment could detect with 80% power. EURUSD bracket tests resolve 3-7 bps/trade; BTC and gold 16-32; the replication pool 56. Reproduce with `python -m qfx.research.power --report docs/results/power_analysis.md --json docs/results/power_analysis.json` (~25 s).
 - [Replication R1](docs/results/replication_r1.md) (+ `.json`, [eligibility](docs/results/replication_r1_eligibility.md)): Volatility Expansion v1 long on ETH/LTC/XRP (N = 3 by pre-registered rule), **not replicated**: pooled -15.78 bps/trade (deployed), day-clustered t -0.59, block drift p = 0.327. The BTCUSD long candidate is closed. Reproduce with `python -m qfx.research.replication --report docs/results/replication_r1.md --json docs/results/replication_r1.json` (~1.5 min).
 - Volatility Expansion v1 (H1), walk-forward [long](docs/results/walkforward_vol_expansion_long.md) / [short](docs/results/walkforward_vol_expansion_short.md) and [drift control](docs/results/drift_baseline_v1_vol_expansion.md): **not qualified**. XAUUSD long passes walk-forward on the forced track, but random long gold trades earn most of it (drift p = 0.174). BTCUSD long beat drift (p = 0.044) but failed walk-forward significance; it was then not replicated on ETH/LTC/XRP (Replication R1) and is closed.
 - [Drift Baseline v1](docs/results/drift_baseline_v1.md) (+ `.json`): timing-shuffled control for the sweep hypothesis; **no demonstrated timing edge** vs hour-matched random timing in either direction on any instrument. Sweep-long in-sample gains on gold/BTC were drift. Reproduce with `python -m qfx.research.drift --report docs/results/drift_baseline_v1.md --json docs/results/drift_baseline_v1.json` (~3 min); `--group expansion` for the volatility-expansion control.
