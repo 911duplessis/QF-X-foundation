@@ -25,6 +25,21 @@ The objective is not maximum trade frequency. The objective is a repeatable cond
 - tests/ — executable invariants and regression tests
 - data/ — local research datasets; ignored by default
 
+## Implemented modules
+
+| Module | Role |
+|---|---|
+| `data_quality` | Gate 0: OHLC validity, tz-aware timestamps, duplicates, ordering, gaps, frozen prices, stale feed |
+| `regime` | Deterministic baseline regime classifier |
+| `volatility` | True range, realized volatility |
+| `structure` | Causal swings (with `confirmed_at`), break of structure, equal-level liquidity pools, sweeps |
+| `expectancy` | EV gate after costs, with minimum sample size |
+| `sizing` | Instrument-aware position sizing, always rounds down |
+| `risk` | Hard limits and kill switches; correlated exposure shares the open-risk limit |
+| `pipeline` | DATA QUALITY -> REGIME -> VOLATILITY -> EDGE -> RISK -> research decision (default NO_TRADE) |
+
+Run tests: `pip install -e .[test] && pytest`
+
 ## Design principle
 
 QF-X is not a single trading strategy. It is a market-state engine that decides when a strategy hypothesis is appropriate and when **NO_TRADE** is the correct decision.
