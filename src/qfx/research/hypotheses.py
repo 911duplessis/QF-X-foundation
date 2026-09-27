@@ -23,19 +23,34 @@ class TrendParams:
             raise ValueError("Require 0 <= exit_z < entry_z")
 
 
-def trend_continuation(bars: Sequence[Bar], params: TrendParams, offset: int = 0) -> Signal:
+@dataclass(frozen=True)
+class TrendFeatures:
+    z: list[float]
+    long_vol: list[float]
+    short_vol: list[float]
+
+
+def trend_features(bars: Sequence[Bar], params: TrendParams) -> TrendFeatures:
+    """Causal features for the whole series; reusable across segments."""
+    closes = [b.close for b in bars]
+    rets = log_returns(closes)
+    long_vol = ewma_vol(rets, params.vol_halflife)
+    return TrendFeatures(trend_z(closes, params.lookback, long_vol), long_vol, ewma_vol(rets, params.shock_halflife))
+
+
+def trend_continuation(
+    bars: Sequence[Bar], params: TrendParams, offset: int = 0, features: TrendFeatures | None = None
+) -> Signal:
     """Hypothesis 1: persistent, volatility-normalised moves continue.
 
     Enter when |z| >= entry_z; hold while z stays beyond exit_z in the same
     direction; stand aside (NO_TRADE) during volatility shocks.
     ``offset`` maps segment-local indices to positions in ``bars`` so that
     features can warm up on earlier history without leaking later data.
+    ``features`` must come from ``trend_features(bars, params)``.
     """
-    closes = [b.close for b in bars]
-    rets = log_returns(closes)
-    long_vol = ewma_vol(rets, params.vol_halflife)
-    short_vol = ewma_vol(rets, params.shock_halflife)
-    z = trend_z(closes, params.lookback, long_vol)
+    f = features or trend_features(bars, params)
+    z, long_vol, short_vol = f.z, f.long_vol, f.short_vol
     state: dict[str, Side | None] = {"side": None}
 
     def signal(view: Sequence[Bar], i: int) -> Side | None:

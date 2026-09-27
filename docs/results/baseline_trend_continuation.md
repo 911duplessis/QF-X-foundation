@@ -14,15 +14,6 @@ Qualification rule: validation and test net > 0, test t >= 2.0, test trades >= 3
 | EURUSD | NO | test net <= 0; test trades 20 < 30; test t -3.79 < 2.0; negative at 2x costs |
 | XAUUSD | NO | validation net <= 0; test trades 24 < 30; test t +0.17 < 2.0 |
 
-## Findings
-
-- **No qualified edge.** The volatility-normalised trend-continuation hypothesis fails out of sample on all three instruments. Treat it as the NO_TRADE baseline that later hypotheses must beat.
-- **Sign instability is the main failure.** EURUSD goes -0.4 / +37.7 / -36.3 bps across train/validation/test; XAUUSD +33.7 / -20.7 / +10.8. An edge that flips sign between periods cannot be traded.
-- **Samples are too thin.** The slow parameters the grid prefers produce 11-24 trades per unseen segment. BTC test (+336 bps, t=2.19) rests on 14 trades after a negative validation period, which is noise, not evidence.
-- **Costs are not the binding constraint on FX/gold** (1-2 bps per trade, and doubling them changes little). The gross signal is the problem.
-- **BTC costs changed structurally.** Median quoted spread at this broker was 80 bps (2021) and 168 bps (2022), falling to about 2 bps by 2025-26. BTC train results are not cost-comparable to test.
-- **Train selection overfits toward few-trade corners** (largest lookback, highest threshold). Future grids need a minimum-sample rule that is harder to game, or fewer free parameters.
-
 ## BTCUSD
 
 Data: 50058 bars, 2020-12-02 to 2026-08-24 UTC. Chosen on train: lookback=168, entry_z=2.0, exit_z=0.5.

@@ -22,6 +22,12 @@ class Stats:
     max_drawdown_bps: float
     avg_hold_hours: float
     exposure: float  # fraction of segment time in a position
+    avg_win_bps: float = 0.0
+    avg_loss_bps: float = 0.0  # magnitude; expectancy = win*avg_win - (1-win)*avg_loss
+
+    @property
+    def total_bps(self) -> float:
+        return self.net_bps * self.trades
 
 
 def _bps(t: Trade) -> float:
@@ -56,4 +62,6 @@ def trade_stats(trades: Sequence[Trade], frictionless: Sequence[Trade], segment_
         max_drawdown_bps=dd,
         avg_hold_hours=mean(hold),
         exposure=sum(hold) / segment_hours if segment_hours > 0 else 0.0,
+        avg_win_bps=mean([x for x in net if x > 0]) if any(x > 0 for x in net) else 0.0,
+        avg_loss_bps=-mean([x for x in net if x <= 0]) if any(x <= 0 for x in net) else 0.0,
     )

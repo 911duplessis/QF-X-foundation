@@ -38,7 +38,7 @@ The objective is not maximum trade frequency. The objective is a repeatable cond
 | `risk` | Hard limits and kill switches; correlated exposure shares the open-risk limit |
 | `backtest` | Gate 2 harness: delayed fills, per-bar spread (floor), commission, slippage; no look-ahead |
 | `backtest.mt5` | MT5 export loader: server time -> UTC, spread points -> price, D1 prefix trimming, Gate 0 |
-| `research` | Causal features, chronological splits, hypotheses, baseline experiment with qualification rule |
+| `research` | Causal features, hypotheses, chronological splits, rolling walk-forward with stability metrics, qualification rules, JSON + markdown reports |
 | `pipeline` | DATA QUALITY -> REGIME -> VOLATILITY -> EDGE -> RISK -> research decision (default NO_TRADE) |
 
 Run tests: `pip install -e .[test] && pytest`
@@ -58,7 +58,10 @@ Verified properties of these exports:
 
 ## Research results
 
-- [Baseline: trend continuation (H1)](docs/results/baseline_trend_continuation.md): **no qualified edge** on EURUSD, XAUUSD or BTCUSD. Reproduce with `python -m qfx.research.baseline --report docs/results/baseline_trend_continuation.md`.
+Interpretation lives in the [research log](docs/results/RESEARCH_LOG.md); generated reports sit next to it.
+
+- [Walk-forward: trend continuation (H1)](docs/results/walkforward_trend_continuation.md) (+ `.json`): **no demonstrated edge** on EURUSD, XAUUSD or BTCUSD across 6-7 rolling test windows each. Reproduce with `python -m qfx.research.walkforward --report docs/results/walkforward_trend_continuation.md --json docs/results/walkforward_trend_continuation.json`.
+- [Baseline: trend continuation (H1)](docs/results/baseline_trend_continuation.md): single split, superseded by the walk-forward. Reproduce with `python -m qfx.research.baseline --report docs/results/baseline_trend_continuation.md`.
 
 ## Design principle
 
