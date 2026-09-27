@@ -130,19 +130,51 @@ broker Just Global Markets Ltd.), screenshots stored at
   - tick size and tick value display as 0.
 - QF-X does not need contract size or tick value: returns and costs are in
   price units and bps, where they cancel.
-- Commission is not shown in the specification.
-- **Swap: no swap section appears in any captured window** (no Swap type,
-  Swap long/short or 3-days swap rows). Financing status is **UNVERIFIED**
-  until the demo rollover check below.
+- **Commission: 0** (broker crypto conditions page, Standard account).
+- **Swap: none on this account.** Two independent sources agree:
+  - no swap section appears in any captured Specification window;
+  - the JustMarkets crypto conditions page (text pasted by the account owner
+    on 2026-09-27, excerpt stored at `assets/replication_r1_broker_crypto_conditions_2026-09-27.md`)
+    says every crypto symbol is "Extended Swap-free available" and that
+    "all customer accounts from any country are automatically given
+    swap-free status".
+- The demo rollover check is now optional confirmation, not a blocker.
 - Current trade mode (e.g. DOTUSD "Close only") is not an eligibility
   criterion; eligibility is historical.
 
-**Financing verification (required before any strategy computation):** open
-0.01 lot ETHUSD.m on the demo account, hold it across one server rollover
-(00:00), and record the Swap column.
-- 0.00 -> financing = 0 for all replication symbols.
-- Non-zero -> the observed charge defines the rate and the weekend rule is
-  checked the same way across a Saturday rollover.
+### Financing rule (recorded 2026-09-27)
+
+- **Primary: financing = 0** (swap-free account status). The primary
+  outcome and all qualification rules use this.
+- **Descriptive sensitivity: standard (non-swap-free) rates**, per the same
+  broker page:
+  - the published long swap in points per night;
+  - charged at 22:00 server time on weekdays only, with Wednesday tripled;
+  - converted to bps of entry price.
+
+  Reported next to the primary result for the replication and for the
+  BTCUSD v1 re-costing. It has **no qualification role**, but it shows
+  whether any edge depends on swap-free status.
+- Risk recorded: swap-free status is a broker policy and can change; a
+  result that only survives at zero financing depends on it.
+
+| symbol | standard long swap (points/night) | digits (from quotes) | bps per night at capture prices |
+|---|---|---|---|
+| BTCUSD.m | -8466.6 | 2 | -9.99 |
+| ETHUSD.m | -280.56 | 2 | -10.33 |
+| LTCUSD.m | -10.632 | 2 | -14.74 |
+| XRPUSD.m | -27.828 | 4 | -18.1 |
+| BCHUSD.m | -39.228 | 2 | -11.42 |
+| UNIUSD.m | -98.53 | 4 | -9.84 |
+| AVAXUSD.m | -336 | 4 | -30.29 |
+| DOGEUSD.m | -32.16 | 5 | -32.81 |
+| LINKUSD.m | -19.68 | 3 | -13.71 |
+| MATICUSD.m | -4.08 | 4 | -33.93 |
+
+Estimated impact on the BTCUSD v1 candidate at standard rates: average hold
+6-30 hours by window (~0.5-1 rollover per trade plus Wednesday triples),
+about -5 to -10 bps against +15.85 bps/trade. The exact re-costing is
+computed with the financing implementation (checkpoint 4).
 
 ## Costs (rule-based, fixed before data)
 
@@ -311,9 +343,13 @@ back. Whether it goes further back does not affect eligibility.
     "data_end": "earliest_last_bar_across_eligible_coins",
     "minimum_n": null
   },
+  "financing": {"primary_bps_per_night": 0.0, "basis": "account swap-free status (spec window + broker page)",
+                "sensitivity": "standard_long_swap_points_22:00_server_weekdays_wednesday_triple",
+                "sensitivity_role": "descriptive_only",
+                "standard_long_swap_points": {"BTCUSD.m": -8466.6, "ETHUSD.m": -280.56, "LTCUSD.m": -10.632, "XRPUSD.m": -27.828, "BCHUSD.m": -39.228, "UNIUSD.m": -98.53, "AVAXUSD.m": -336, "DOGEUSD.m": -32.16, "LINKUSD.m": -19.68, "MATICUSD.m": -4.08}},
   "costs": {"spread_floor": "median_quoted_spread_across_market_watch_snapshots",
             "spread_floor_values": {"BCHUSD.m": 0.8000000000000114, "ETHUSD.m": 1.400000000000091, "LTCUSD.m": 1.4300000000000068, "XRPUSD.m": 0.010000000000000009, "ADAUSD.m": 0.0007000000000000339, "DOTUSD.m": 0.0050000000000001155, "XLMUSD.m": 0.0003999999999999837, "KSMUSD.m": 0.04999999999999982, "SOLUSD.m": 0.20999999999999375, "TRXUSD.m": 0.0005800000000000249, "UNIUSD.m": 0.010099999999999554, "AVAXUSD.m": 0.024200000000000443, "DOGEUSD.m": 0.0002400000000000041, "LINKUSD.m": 0.019999999999999574, "MATICUSD.m": 0.0005999999999999894}, "slippage_ratio_of_floor": 0.16666666666666666,
-            "financing": "recorded_long_swap_per_rollover", "stress_multiplier_includes_financing": true},
+            "commission": 0.0, "stress_multiplier_includes_financing": true},
   "walkforward": {"windows": "unchanged", "common_origin": "2021-01-01T00:00:00Z", "selection": "per_coin_as_v1"},
   "primary": {"statistic": "pooled_mean_net_bps_after_financing", "clustered_t_min": 2.0,
               "cluster": "utc_entry_day", "drift_max_p": 0.05, "existing_walkforward_rules": "all"},
