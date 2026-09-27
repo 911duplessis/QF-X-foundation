@@ -39,6 +39,7 @@ The objective is not maximum trade frequency. The objective is a repeatable cond
 | `backtest.bracket` | Stop/target/time-stop execution: stop first on same-bar touch, gaps fill at the open, R per trade |
 | `backtest` | Gate 2 harness: delayed fills, per-bar spread (floor), commission, slippage; no look-ahead |
 | `backtest.mt5` | MT5 export loader: server time -> UTC, spread points -> price, D1 prefix trimming, Gate 0 |
+| `research.drift` | Drift Baseline v1: hour-matched timing-shuffled control, one-sided randomization test (frozen spec) |
 | `research.sweep` | Liquidity Sweep Reversal v1, checked against its frozen specification by test |
 | `research` | Causal features, hypotheses, chronological splits, rolling walk-forward with stability metrics, qualification rules, JSON + markdown reports |
 | `pipeline` | DATA QUALITY -> REGIME -> VOLATILITY -> EDGE -> RISK -> research decision (default NO_TRADE) |
@@ -62,9 +63,14 @@ Verified properties of these exports:
 
 Interpretation lives in the [research log](docs/results/RESEARCH_LOG.md); generated reports sit next to it.
 
+- [Drift Baseline v1](docs/results/drift_baseline_v1.md) (+ `.json`): timing-shuffled control for the sweep hypothesis; **no demonstrated timing edge** vs hour-matched random timing in either direction on any instrument. Sweep-long in-sample gains on gold/BTC were drift. Reproduce with `python -m qfx.research.drift --report docs/results/drift_baseline_v1.md --json docs/results/drift_baseline_v1.json` (~3 min).
 - Walk-forward: Liquidity Sweep Reversal v1 (H1), [long](docs/results/walkforward_sweep_reversal_long.md) / [short](docs/results/walkforward_sweep_reversal_short.md) (+ `.json`): **no demonstrated edge** in either direction on any instrument; EURUSD edge bounded at about +1 bps/trade. Pre-registered in [docs/hypotheses/](docs/hypotheses/liquidity_sweep_reversal_v1.md). Reproduce with `python -m qfx.research.walkforward --hypothesis sweep_reversal_long` (or `_short`) plus `--report`/`--json`.
 - [Walk-forward: trend continuation (H1)](docs/results/walkforward_trend_continuation.md) (+ `.json`): **no demonstrated edge** on EURUSD, XAUUSD or BTCUSD across 6-7 rolling test windows each. Reproduce with `python -m qfx.research.walkforward --report docs/results/walkforward_trend_continuation.md --json docs/results/walkforward_trend_continuation.json`.
 - [Baseline: trend continuation (H1)](docs/results/baseline_trend_continuation.md): single split, superseded by the walk-forward. Reproduce with `python -m qfx.research.baseline --report docs/results/baseline_trend_continuation.md`.
+
+## Qualification
+
+A hypothesis qualifies only if it passes every walk-forward rule (pooled and consistency) **and**, for bracket hypotheses, beats its matched drift baseline at p <= 0.05. The drift test is necessary, not sufficient.
 
 ## Design principle
 
