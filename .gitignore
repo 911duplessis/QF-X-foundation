@@ -12,3 +12,6 @@ data/*
 *.csv
 *.parquet
 *.feather
+# Versioned research datasets (MT5 exports) are allowed under data/mt5/
+!data/mt5/
+!data/mt5/*.csv

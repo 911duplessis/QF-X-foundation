@@ -10,6 +10,8 @@ Timing contract (no look-ahead):
   holding a position requests an exit.
 - A position still open at the end of the data is closed at the last close so
   unfinished trades are never silently dropped.
+- Spread per fill is ``max(bar.spread, costs.spread)``: the configured spread
+  is a floor, so per-bar data can only make costs more realistic, never lower.
 """
 from __future__ import annotations
 
@@ -50,8 +52,12 @@ def _opposite(side: Side) -> Side:
     return Side.SHORT if side is Side.LONG else Side.LONG
 
 
+def _spread(bar: Bar, costs: ExecutionCosts) -> float:
+    return max(bar.spread, costs.spread) if bar.spread is not None else costs.spread
+
+
 def _close(held_side: Side, entry_bar: Bar, entry: float, exit_bar: Bar, exit_mid: float, costs: ExecutionCosts) -> Trade:
-    exit = execution_price(exit_mid, _opposite(held_side), costs.spread, costs.slippage)
+    exit = execution_price(exit_mid, _opposite(held_side), _spread(exit_bar, costs), costs.slippage)
     gross = (exit - entry) if held_side is Side.LONG else (entry - exit)
     total_cost = trade_cost(entry, exit, costs)
     return Trade(held_side, entry_bar.timestamp, exit_bar.timestamp, entry, exit, gross, total_cost, gross - total_cost)
@@ -75,7 +81,8 @@ def run_backtest(bars: Sequence[Bar], signal: Signal, *, costs: ExecutionCosts |
             entry_index = i + delay
             if entry_index >= len(bars):
                 break
-            entry = execution_price(bars[entry_index].open, side, costs.spread, costs.slippage)
+            entry_bar = bars[entry_index]
+            entry = execution_price(entry_bar.open, side, _spread(entry_bar, costs), costs.slippage)
             position = (side, entry_index, entry)
             continue
 

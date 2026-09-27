@@ -19,6 +19,8 @@ class Bar:
     low: float
     close: float
     volume: float | None = None
+    # Quoted spread for the bar in price units, when the data source provides it.
+    spread: float | None = None
 
 
 @dataclass(frozen=True)
