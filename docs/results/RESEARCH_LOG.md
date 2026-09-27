@@ -3,11 +3,70 @@
 Interpretation of generated results. Files in this directory ending in `.md`/`.json`
 next to an experiment are generated and must not be hand-edited; conclusions live here.
 
-Research sequence: rolling walk-forward (done) -> trend continuation (no demonstrated edge) -> liquidity sweep/reversal (no demonstrated edge; no timing edge vs drift baseline) -> volatility expansion (not qualified; BTCUSD long candidate awaiting new data)
+Research sequence: rolling walk-forward (done) -> trend continuation (no demonstrated edge) -> liquidity sweep/reversal (no demonstrated edge; no timing edge vs drift baseline) -> volatility expansion (not qualified) -> Replication R1 of the BTCUSD long candidate (not replicated; candidate closed)
 -> volatility expansion -> regime-conditional combinations -> meta-engine
 -> portfolio/correlation -> shadow trading. No execution layer before shadow trading passes.
 
 Language rule: results say "no demonstrated edge", never "does not work".
+
+## 2026-09 - Replication R1: Volatility Expansion v1 (long) on the broker crypto universe
+
+Pre-registration trail:
+- universe captured `4bb951a`;
+- v1 frozen `28fe237`;
+- v2 amendment (BTC-base symbols excluded) `32c16e4`;
+- spreads, specs and financing `4cc06bd` / `3ab38da`;
+- eligibility (checkpoint 3) `737a190`;
+- checkpoint-4 spec, code and tests `1b6fb6e`, committed before any replication result.
+
+Report: [replication_r1.md](replication_r1.md) (+ `.json`); eligibility: [replication_r1_eligibility.md](replication_r1_eligibility.md).
+
+**Primary outcome: NOT REPLICATED.** The pooled ETH/LTC/XRP result fails 7 rules:
+
+| rule | result |
+|---|---|
+| pooled test net > 0 (deployed) | -15.78 bps/trade (forced -26.27) |
+| positive at 2x costs | -19.83 |
+| >= 60% traded windows profitable | 25% (forced 17%) |
+| median window > 0 | -16.3 |
+| >= 60% windows surviving 2x costs | 0% |
+| day-clustered t >= 2 | -0.59 (forced -1.34) |
+| block drift p <= 0.05 | 0.327 |
+
+- **Effectively an ETH test.**
+  - The frozen cost gate (spread <= 25% of stop distance) admitted 5 LTC trades (168 bps cost/trade) and 91 XRP trades (60 bps). All 122 deployed trades and 190 of 286 forced trades are ETH.
+  - N = 3 by rule, but the evidence comes mostly from one coin.
+  - This is the frozen rule working as specified; it is not changed after the fact.
+- **ETH is the fairest test available, and it fails clearly.**
+  - Liquid, cheap (7.3 bps cost/trade), and the coin most correlated with BTC.
+  - Forced track: -20.39 bps/trade, 1 of 6 windows profitable.
+  - If the BTCUSD observation reflected a crypto-wide breakout effect, ETH is where it should have appeared.
+- **Clustering diagnostics:**
+  - forced: 286 trades on 244 unique days, raw t -1.45 vs clustered -1.34;
+  - deployed: 122 trades on 119 days.
+  - The cross-coin clustering we guarded against was small, because LTC and XRP rarely traded.
+  - The projected ~600-trade sample did not materialize, for the cost reason above.
+- **Block drift control:**
+  - test: the observed result beats the matched random timing by +6.58 bps (p = 0.327), but both are negative;
+  - train p = 0.002, which is selection-biased and not evidence (as recorded in the spec);
+  - the control produced more trades than observed (339 vs 286), consistent with breakout signals clustering in time.
+- **XRP, descriptive only:** gross before costs is roughly +26 bps/trade on 91 trades, and net is -34 after 60 bps of costs. It is too few trades and too expensive to mean anything, and per-coin results have no qualification role.
+
+**Financing sensitivity (descriptive):**
+- Standard swaps would make the pooled result worse: forced -26.27 -> -34.83.
+- **BTCUSD v1 candidate re-costed:** +15.85 -> **+9.91 bps/trade** at standard swaps (-5.94), within the -5 to -10 estimate recorded before the run.
+
+**Status of the BTCUSD long observation: not replicated, demoted.**
+- Original evidence: drift p = 0.044, walk-forward t = 1.61, not significant after multiple-comparison adjustment.
+- It did not reproduce on the one independent, affordable, highly correlated instrument available (ETH).
+- The most likely explanation is a BTC- and period-specific result (chance plus drift).
+- Per the research rules this reads "no demonstrated edge", not "volatility expansion does not work".
+- The BTCUSD observation is **closed**: re-testing it on the same data, or on newly chosen instruments after seeing this result, would be a new discovery exercise and needs its own pre-registration.
+
+**Limitations recorded:**
+- the broker's short crypto history (most coins from 2022) limited the universe;
+- high spreads on LTC and XRP limited the effective sample;
+- a failure driven mostly by ETH is weaker evidence about low-spread altcoins in general than about ETH.
 
 ## 2026-09 - Volatility Expansion v1 (H1): walk-forward and drift control
 
