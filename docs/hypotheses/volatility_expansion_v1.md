@@ -1,8 +1,10 @@
 # Volatility Expansion v1
 
-Status: **DRAFT**, awaiting approval. Nothing below has been implemented or run.
-Once approved, the status changes to FROZEN in a commit made before any code;
-the JSON block then becomes machine-checked by test.
+Status: **FROZEN** before any implementation. Approved 2026-09-27 (draft
+`fe4ebfe`, corrected per review: `atr_period` removed, compression rank
+defined, drift control's ATR normalisation stated). Any change requires a v2;
+the JSON block at the end is machine-checked by test. No code for this
+hypothesis existed before this commit.
 
 ## Hypothesis
 
@@ -50,10 +52,13 @@ drift-baseline comparison and verdict.
 1. **Box.** For signal bar j and the grid's `box_bars` N, the box covers bars
    j-N .. j-1 (it excludes the signal bar). Box high = max high, box low = min
    low, width W = box high - box low.
-2. **Compression.** The box is compressed when W is at or below the
-   `compression_percentile` of the widths of the boxes ending on each of the
-   previous `compression_lookback_bars` bars (the N-bar boxes ending at bars
-   j-1-L .. j-2, L = lookback). The history must be complete; otherwise no signal.
+2. **Compression.** The reference set is the widths of the L =
+   `compression_lookback_bars` N-bar boxes ending at bars j-2, j-3, .., j-1-L
+   (the L boxes immediately before the current one). The box is compressed
+   when its **rank** is at most `compression_percentile`:
+   #{reference widths strictly smaller than W} / L <= 0.20.
+   The reference set must be complete (all L boxes exist); otherwise there is
+   no signal.
 3. **Breakout.** On bar j, with a compressed box: close[j] > box high gives a
    long signal; close[j] < box low gives a short signal. The signal bar is j.
    There is no other confirmation.
@@ -109,11 +114,18 @@ drift-baseline comparison and verdict.
   covers "every future bracket hypothesis"; the only change is adding the
   two hypothesis names to its `applies_to` list. The method and values are
   unchanged.
+- **ATR appears only inside the drift control, never in this hypothesis.**
+  The control records each template's stop distance in ATR units and
+  rescales it at the random bar. It uses ATR(24) (simple mean of 24 true
+  ranges), exactly as in the Drift Baseline v1 run on the sweep hypothesis.
+  This is part of the control's fixed procedure, not a parameter of this
+  hypothesis, and it does not affect the hypothesis's own signals, stops,
+  targets or gates.
 - **Qualification:** every walk-forward rule **and** drift-baseline p <= 0.05
   (necessary, not sufficient), evaluated per direction.
 - Results in bps and R, per direction; exit-reason breakdown reported.
 
-## Frozen parameters (after approval)
+## Frozen parameters
 
 ```json
 {
@@ -128,7 +140,7 @@ drift-baseline comparison and verdict.
   "fixed": {
     "compression_percentile": 0.2,
     "compression_lookback_bars": 500,
-    "atr_period": 24,
+    "compression_rule": "count(reference_width < width) / lookback <= compression_percentile",
     "max_hold_bars": 48,
     "vol_long_halflife": 240.0,
     "vol_shock_halflife": 6.0,
@@ -139,6 +151,6 @@ drift-baseline comparison and verdict.
   },
   "walkforward": "unchanged from liquidity_sweep_reversal_v1",
   "costs": "unchanged from liquidity_sweep_reversal_v1",
-  "drift_baseline": {"spec": "drift_baseline_v1", "applies": true, "max_p": 0.05}
+  "drift_baseline": {"spec": "drift_baseline_v1", "applies": true, "max_p": 0.05, "control_atr_period": 24}
 }
 ```
