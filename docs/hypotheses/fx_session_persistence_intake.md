@@ -58,8 +58,14 @@ files as exported.
   per-trade dispersion figures (`docs/results/power_analysis.json`), not new
   computations on any FX data.
 
+## Capture completed (2026-09-27)
+
+- MT5 Specification windows for all seven pairs, each with the full Market
+  Watch panel showing bid/ask for all seven, stored as
+  `assets/fx_spec_<PAIR>_2026-09-27.png` (hashes in the draft spec).
+- Quotes are identical across the seven screenshots (13:05-13:08 server,
+  Sunday): these are Friday-close quotes.
+
 ## Still required before freeze
 
-- Market Watch bid/ask snapshot (CSV export) for the seven pairs, used for
-  spread floors under the Replication R1 rule (median quoted spread at capture).
-- Specification draft, pre-data power calculation, and account-owner approval.
+- Account-owner decisions D1-D7 in `fx_session_persistence_v1.md`.
