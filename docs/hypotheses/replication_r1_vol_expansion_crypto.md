@@ -320,6 +320,53 @@ the trade count suggests. A failure to replicate at N = 3 is weaker evidence
 against the BTC observation than a failure at larger N would be. A success
 still has to pass every rule.
 
+## Checkpoint 4 freeze (2026-09-27)
+
+Committed together with the checkpoint-4 code and tests, **before any
+replication result exists**. Up to and including this commit:
+- no strategy calculation (signals, trades, returns) has been run on
+  ETHUSD.m, LTCUSD.m or XRPUSD.m;
+- the only computations on replication data were the checkpoint-3
+  data-quality and history checks.
+
+**Frozen as approved by the account owner:**
+
+1. **Universe:** ETHUSD.m, LTCUSD.m, XRPUSD.m only (N = 3). No further
+   exclusions based on results; no shorter-history coins added.
+2. **Walk-forward:**
+   - Volatility Expansion v1 unchanged, long only;
+   - per-coin parameter selection exactly as v1;
+   - common origin 2021-01-01 UTC; 24M / 6M / 6M windows with a 6M step;
+   - results pooled across coins window by window;
+   - qualification on the pooled **deployed** track (as v1).
+3. **Clustered t:** calendar-day (UTC entry date) clustered SE; threshold
+   t >= 2. The report always shows:
+   - number of trades;
+   - number of unique calendar days;
+   - number of test windows;
+   - the raw trade-level t (**diagnostic only**);
+   - the day-clustered t (**used for qualification**).
+4. **Drift control:**
+   - replays observed signals, never searches for new ones;
+   - same-UTC-hour randomization;
+   - signals at the same timestamp form a group, and the whole group gets
+     one random timestamp;
+   - on any member's gate failure (or missing bar), the whole group is
+     redrawn, up to 20 redraws, then dropped and recorded;
+   - 500 fixed-seed repetitions;
+   - same pooled statistic as observed (mean net bps/trade, forced track as
+     in Drift Baseline v1);
+   - p = (1 + #{control >= observed}) / 501.
+5. **Primary outcome:** the pooled deployed track passes every walk-forward
+   rule, with the IID pooled t replaced by day-clustered t >= 2, **and**
+   block drift p <= 0.05 on test segments. Per-coin results are descriptive.
+6. **Financing:**
+   - primary = 0 (swap-free account);
+   - standard swaps (22:00 server, weekdays, Wednesday x3; holding interval
+     [entry, exit + 1 bar)) reported as a descriptive sensitivity for the
+     replication, and separately as a BTCUSD v1 re-costing;
+   - neither can alter the replication verdict.
+
 ## Explicitly forbidden
 
 - New parameter grid, compression threshold or lookback.
@@ -382,6 +429,21 @@ still has to pass every rule.
   "drift_control": {"spec": "drift_baseline_v1", "randomization_unit": "signal_timestamp_group",
                     "hour_matched": true, "repetitions": 500, "max_redraws": 20,
                     "gate_failure": "redraw_or_drop_whole_group", "re_detect_signals": false},
-  "per_coin_results": "descriptive_only"
+  "per_coin_results": "descriptive_only",
+  "checkpoint4": {
+    "eligible": ["ETHUSD.m", "LTCUSD.m", "XRPUSD.m"],
+    "origin": "2021-01-01T00:00:00Z",
+    "qualification_track": "deployed",
+    "drift_track": "forced",
+    "clustered_t_min": 2.0,
+    "cluster": "utc_entry_day",
+    "report_fields": ["trades", "unique_days", "windows", "raw_t_diagnostic", "clustered_t"],
+    "drift": {"repetitions": 500, "p_denominator": 501, "max_redraws": 20, "max_p": 0.05,
+              "group": "same_signal_timestamp", "hour_matched": true, "redraw_scope": "whole_group"},
+    "financing_primary": 0.0,
+    "financing_sensitivity": {"rollover_hour_server": 22, "weekdays_only": true, "triple_weekday": "wednesday",
+                              "holding_interval": "entry_to_exit_plus_one_bar"},
+    "strategy_computation_before_checkpoint4": false
+  }
 }
 ```
