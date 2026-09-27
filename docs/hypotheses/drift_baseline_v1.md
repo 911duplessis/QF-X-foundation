@@ -1,8 +1,10 @@
 # Drift Baseline v1 (timing-shuffled control)
 
-Status: **DRAFT**, awaiting approval. Nothing below has been implemented or run.
-Once approved, the status changes to FROZEN in a commit made before any code,
-and the JSON block becomes machine-checked like the sweep specification.
+Status: **FROZEN** before implementation. Approved 2026-09-27 (draft commit
+`cae9793`, refined per review). Any change requires a v2; the JSON block at the
+end is machine-checked by test. **The sweep hypothesis parameters must not be
+changed on the basis of this control**: it tests the already-defined
+hypothesis and is not an optimization loop.
 
 ## Purpose
 
@@ -48,35 +50,62 @@ that window**. The control never selects parameters of its own.
    sha256("hypothesis|symbol|window|segment|r"). Re-running reproduces identical
    results.
 
-## Statistics
+## Statistical test (fixed before execution)
 
-For every window and segment, the report shows:
+A **one-sided empirical randomization test**, evaluated separately for long and
+short, never combined.
 
-- the hypothesis net bps/trade and its trade count;
-- the control's mean, median, 5th and 95th percentile net bps/trade and trade count;
-- the hypothesis's excess over the control mean;
-- the hypothesis's one-sided p-value: (1 + #{control_r >= hypothesis}) / (N + 1).
+- **Test statistic T:** mean net bps per trade. T_obs is computed on the
+  hypothesis's actual trades; T_r on control repetition r (r = 1..N).
+- **Primary effect size:** T_obs - mean(T_r), the difference in mean net
+  bps/trade between the actual trades and the matched random-time control.
+- **p-value:** (1 + #{r : T_r >= T_obs}) / (N + 1). The alternative is that
+  the hypothesis's timing is better than random timing.
+- **Secondary statistic:** total net P&L in bps (sum over trades), with its
+  own p-value by the same formula, because mean bps/trade can hide
+  differences in trade count.
+- A repetition with zero trades has T_r = 0 and total 0; the count of such
+  repetitions is reported.
 
-Pooled across windows, control repetition r is pooled over all windows (the
-same r in each), which gives N pooled control results per segment type. The
-hypothesis's pooled result is ranked within them.
+Reported for every window and segment, and pooled:
+
+- observed hypothesis mean (T_obs), trade count and total P&L;
+- random-control mean (mean of T_r) and mean trade count;
+- the difference T_obs - mean(T_r);
+- the empirical p-value (primary and secondary);
+- the 5th, 50th and 95th percentiles of T_r;
+- the percentile of T_obs within the null distribution (share of T_r < T_obs);
+- templates dropped after `max_redraws`.
+
+**Pooling:** control repetition r is pooled over all windows (the same r in
+each), which gives N pooled values of T per segment type. T_obs pooled is
+the mean over all of the hypothesis's trades in that segment type.
 
 ## Pre-registered questions and decision rules
 
-- **Q1: drift explanation (train).** If the hypothesis's pooled *train* net lies
-  inside the control's 5-95% band, its in-sample result is attributed to drift
-  and geometry, not timing. This tests the open question on sweep long-side
-  train positivity. Above the 95th percentile means timing had in-sample value.
-- **Q2: timing value (test).** Pooled *test* p <= 0.05 means timing adds value
-  out of sample. Otherwise: no demonstrated timing value.
+- **Q1: drift explanation (train).** If pooled *train* T_obs lies inside the
+  control's 5th-95th percentile band, the in-sample result is attributed to
+  drift and geometry, not timing. This tests the open question on sweep
+  long-side train positivity. Above the 95th percentile means timing had
+  in-sample value; below the 5th means timing was worse than random.
+- **Q2: timing value (test).** Pooled *test* p <= 0.05 (primary statistic)
+  means a demonstrated timing edge out of sample. Otherwise: no demonstrated
+  timing edge.
 - **Q3: drift line.** The control's pooled mean per direction is reported as
   the drift benchmark each future directional result is read against.
 
-## Proposed qualification amendment (for approval, separate decision)
+## Qualification amendment (approved)
 
-For future hypotheses only, add one rule to walk-forward qualification: the
-deployed track's pooled test net must beat its timing-shuffled control at
-p <= 0.05. Sweep Reversal v1 is not re-qualified, since it already fails.
+For future hypotheses:
+
+> **A hypothesis must demonstrate statistically significant improvement over
+> its matched drift baseline at p <= 0.05 before its timing edge can be
+> considered demonstrated.**
+
+p <= 0.05 is **necessary, not sufficient**. All existing walk-forward
+qualification rules remain mandatory, so a tiny but statistically significant
+effect cannot pass with poor economic significance or instability. Sweep
+Reversal v1 is not re-qualified, since it already fails.
 
 ## Explicitly excluded in v1
 
@@ -85,7 +114,7 @@ p <= 0.05. Sweep Reversal v1 is not re-qualified, since it already fails.
   limits degrees of freedom; a finer match would need a v2.
 - No control for trend continuation.
 
-## Frozen parameters (after approval)
+## Frozen parameters
 
 ```json
 {
@@ -98,9 +127,16 @@ p <= 0.05. Sweep Reversal v1 is not re-qualified, since it already fails.
   "repetitions": 500,
   "max_redraws": 20,
   "seed_scheme": "sha256(hypothesis|symbol|window|segment|repetition)",
-  "p_value": "(1 + count(control >= hypothesis)) / (repetitions + 1)",
+  "test": "one_sided_empirical_randomization",
+  "statistic": "mean_net_bps_per_trade",
+  "effect_size": "observed_mean_minus_control_mean",
+  "secondary_statistic": "total_net_bps",
+  "p_value": "(1 + count(control >= observed)) / (repetitions + 1)",
+  "zero_trade_repetition_value": 0.0,
+  "percentiles": [0.05, 0.5, 0.95],
   "band": [0.05, 0.95],
   "timing_value_max_p": 0.05,
-  "qualification_amendment": {"proposed": true, "max_p": 0.05}
+  "directions_separate": true,
+  "qualification_amendment": {"approved": true, "max_p": 0.05, "walkforward_rules_remain_mandatory": true}
 }
 ```
