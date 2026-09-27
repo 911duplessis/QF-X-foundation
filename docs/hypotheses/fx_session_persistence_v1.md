@@ -1,10 +1,17 @@
 # FX Session Directional Persistence v1
 
-Status: **DRAFT**. D1-D5 and D7 are approved; **D6 (commission) is pending and blocks the freeze**.
-Nothing is frozen, and no code exists for this hypothesis. **No FX price data
-has been read.** The seven-pair H1 archive is quarantined unread (see
-`fx_session_persistence_intake.md`). The pre-data power calculation below
-uses only already-published figures.
+Status: **FROZEN, version 1** (2026-09-27). All decisions D1-D7 are recorded below.
+This freeze commit contains no code for this hypothesis, and **no FX price
+data has been read**. The seven-pair H1 archive is still quarantined and
+unread (see `fx_session_persistence_intake.md`). The pre-data power
+calculation uses only already-published figures.
+
+The sequence from here, one commit (or more) per step:
+1. this freeze;
+2. implementation and tests on synthetic data only;
+3. verify the archive's sha256, then extract it;
+4. run the walk-forward, then the drift control, then write the research log;
+5. PR for the account owner's review.
 
 ## Hypothesis (one symmetric claim)
 
@@ -151,8 +158,10 @@ Stop multiple, session times and exit are fixed; they are **not** in the grid.
 - **Spread floor** = quoted spread from the captured Market Watch (identical
   in all seven screenshots). The capture was on a **Sunday**, so these are
   Friday-close quotes and conservative. Per-bar MT5 spread applies when wider.
-- **Slippage** = floor / 6; **commission (D6)** = 0 pending confirmation for
-  the account type.
+- **Slippage** = floor / 6 per side.
+- **Commission (D6) = 0**, from account evidence (below).
+- **2x cost stress** doubles the spread floor, per-bar spreads, slippage and
+  commission, as in all prior runs.
 
 | pair | spread floor | points | bps at capture | round trip incl. slippage (bps) |
 |---|---|---|---|---|
@@ -222,8 +231,141 @@ Long / short and per-pair results are descriptive only.
 | D3 | 2.0 x ATR(24) stop, no target, time exit at the 16:00-London bar open (exact convention above) | **approved** |
 | D4 | One parameter set per window, selected jointly across all seven pairs | **approved** |
 | D5 | Central design MDE <= 3 bps as the formal requirement; pessimistic cases reported as sensitivity only | **approved with the wording above** |
-| D6 | Commission per lot for this account's FX instruments | **PENDING**: must be established from broker or account evidence, not assumed. It blocks the freeze. |
+| D6 | Commission = 0 for this account's `.m` FX instruments | **established from account evidence** (below) |
 | D7 | Swap outside the primary cost model (no position crosses rollover) | **approved** |
+
+### D6 evidence: commission
+
+The account owner pasted this row from the account's MT5 trade history
+(positions view) on 2026-09-27:
+
+```
+2026.08.17 13:13:04  449846123  EURUSD.m  sell  0.01  1.15952  1.15995  1.15812  2026.08.17 14:38:29  1.15901  0.00  0.00  0.51
+open time            ticket     symbol    type  vol   open     S/L      T/P      close time           close    comm  swap  profit
+```
+
+- **Commission column = 0.00.**
+- **Cross-check:** (1.15952 - 1.15901) x 1,000 units = $0.51. That equals the
+  profit shown, so no commission is netted into the profit either.
+- **Resolution:** the history shows 2 decimals. A commission of $0.50 or more
+  per lot per side would show as at least $0.01 on this 0.01-lot trade.
+  - A smaller commission would round to 0.00. At EURUSD notional that is
+    < 0.05 bps per side, which is negligible next to the spread and
+    covered by the 2x cost stress.
+- **Scope:** the evidence is EURUSD.m only. The other six `.m` pairs are
+  assumed to share the account's commission schedule. That is disclosed
+  here, and the 2x cost stress is the check against it.
+- Swap on that trade was also 0.00, but it closed intraday before rollover.
+  It is not evidence about swap rates, and D7 does not need it.
+
+## Freeze details (implementation conventions, fixed before any code)
+
+These carry existing project conventions over to this design. None is a
+tuning parameter.
+
+**Data**
+- The files are the seven CSVs inside the quarantined archive, extracted
+  unchanged after verifying the archive sha256.
+- Loader unchanged: server tz Europe/Athens, Gate 0 checks, D1-prefix trim,
+  DST-collision drop, per-bar `<SPREAD>` x point as the per-bar spread.
+- **Origin** 2021-01-04 00:00 UTC for all pairs. Bars before it are dropped.
+- **Data end:** the earliest last-bar timestamp across the seven pairs. Every
+  pair is truncated there, so all pairs cover identical calendar windows.
+
+**Walk-forward with joint selection (D4)**
+- Windows: 24M train, 6M validation, 6M test, 6M step, from the common
+  origin. A partial final test window is kept only if it covers >= 50%.
+- For each window and each of the 4 grid cells, every pair is run on the
+  segment and the trades are **pooled across the seven pairs**.
+- **Train screen** on pooled train trades: >= 30 trades and net > 0.
+- **Validation** selects the survivor with the highest pooled validation net
+  bps/trade. If none survives the screen, the train-best cell goes to the
+  forced track and the deployed track abstains.
+- **Deployed** requires pooled validation >= 5 trades and net > 0, else it
+  abstains. **Forced** always trades the selected cell.
+- **Test:** each pair with the selected cell, pooled.
+- Qualification: all existing walk-forward rules on the pooled per-window
+  deployed results, with the IID t replaced by the day-clustered t:
+  - >= 60% of traded windows profitable; median window > 0;
+  - >= 60% of windows positive at 2x costs; no window > 50% of pooled P&L;
+  - pooled validation > 0; pooled test > 0 with >= 30 trades; pooled 2x net > 0;
+  - **day-clustered t >= 2**, where clusters are UTC entry dates (the same
+    as London session dates, since every entry is at 09:00 or 10:00 London).
+    The formula is the one in Replication R1.
+  - **block drift p <= 0.05** (below).
+
+**Block drift control** (Drift Baseline v1 statistics with R1 block randomization)
+- **Replay, never re-detect.** The observed signals of the window's selected
+  cell (forced track) form groups by signal timestamp. With one K per window,
+  a group is every pair that signalled on the same session day.
+- **Replacement unit:** each group is assigned one random **session day** d'
+  of the same segment, drawn without replacement. "Same hour" means the same
+  London clock time, because the signal, entry and exit times on d' follow
+  the timeline above.
+- **Members on d'** keep their own side. Each gets a stop of close of the last
+  window bar on d' -/+ 2.0 x ATR(24) of d', and the time exit at the 16:00
+  bar of d'. The displacement condition is **not** evaluated on d'.
+- **Redraw:** if any member fails eligibility on d' (missing bars or history,
+  or the entry outside the segment), the whole group is redrawn, up to 20
+  times. After that the group is dropped and the drop is recorded. Members
+  are never kept selectively.
+- 500 repetitions with seeds sha256("fx_session_persistence_v1", "block",
+  window, segment, repetition).
+- Statistic: pooled mean net bps/trade over all pairs;
+  p = (1 + #{control >= observed}) / 501.
+- The test segments are primary. Train and validation are reported as
+  selection-biased diagnostics.
+
+**Stop and exit mechanics**
+- The stop level is set at the signal: close of the last window bar (mid)
+  -/+ 2.0 x ATR(24). The entry fill then pays half spread + slippage, so the
+  realized distance differs slightly, as in every bracket hypothesis here.
+- The time exit is clock-based: the first bar whose open is >= 16:00 London
+  on the session date. It uses future timestamps only, never prices. If that
+  bar is on a later date (a data gap), the trade may cross a rollover. Such
+  cases are counted and reported; swap stays 0 in the primary model (D7).
+
+**Reported descriptively (no qualification role)**
+- long vs short; per pair; exit reasons (time / stop); late time exits;
+- signals per pair and per day (the realized k, next to the power
+  assumption f = 0.40);
+- achieved resolution = 2.8416 x the clustered SE.
+
+## Frozen parameters
+
+```json
+{
+  "name": "fx_session_persistence",
+  "version": 1,
+  "status": "frozen",
+  "hypothesis": "symmetric_directional_persistence",
+  "sides_reported_separately": true,
+  "universe": ["EURUSD.m", "GBPUSD.m", "USDJPY.m", "USDCHF.m", "AUDUSD.m", "USDCAD.m", "NZDUSD.m"],
+  "data": {"archive_sha256": "507058426d86f359097f438a7837b3ff55e115954d9569b441623b51cf10d3ab",
+           "loader": {"tz": "Europe/Athens", "interval_hours": 1, "max_gap_days": 4, "trim_d1_prefix": true},
+           "origin": "2021-01-04T00:00:00Z", "data_end": "earliest_last_bar_across_pairs"},
+  "session": {"tz": "Europe/London", "open": "08:00", "time_exit_bar_open": "16:00", "days": "mon-fri"},
+  "grid": {"window_hours": [1, 2], "theta": [0.5, 1.0]},
+  "fixed": {"atr_period": 24, "atr_window": "24_bars_before_first_window_bar", "min_history_bars": 25,
+            "displacement": "close_last_window_bar_minus_open_first_window_bar", "scale": "atr24_times_sqrt_k",
+            "stop_atr": 2.0, "stop_reference": "close_last_window_bar", "target": null,
+            "entry": "open_of_bar_after_window", "delay_bars": 1, "max_signals_per_pair_day": 1},
+  "costs": {"spread_floor_values": {"EURUSD.m": 0.00012, "GBPUSD.m": 0.00009, "USDJPY.m": 0.025, "USDCHF.m": 0.00013,
+                                    "AUDUSD.m": 0.00009, "USDCAD.m": 0.00022, "NZDUSD.m": 0.00014},
+            "slippage_ratio_of_floor": 0.16666666666666666, "commission": 0.0, "financing": 0.0, "stress_multiplier": 2.0},
+  "walkforward": {"train_months": 24, "validation_months": 6, "test_months": 6, "step_months": 6,
+                  "selection": "joint_across_pairs", "min_train_trades": 30, "min_validation_trades": 5,
+                  "min_partial_test_fraction": 0.5},
+  "primary": {"track": "deployed", "clustered_t_min": 2.0, "cluster": "utc_entry_day", "drift_max_p": 0.05,
+              "existing_walkforward_rules": "all"},
+  "drift": {"track": "forced", "repetitions": 500, "p_denominator": 501, "max_redraws": 20,
+            "group": "same_signal_timestamp", "replacement_unit": "session_day", "redraw_scope": "whole_group",
+            "replay_side": "own", "re_detect_signals": false, "seed_label": "fx_session_persistence_v1"},
+  "power": {"design_mde_bps_central": 2.51, "requirement_bps": 3.0, "sensitivity_bps": [3.35, 3.8]},
+  "decisions": {"D1": "london_local", "D2": "approved", "D3": "approved", "D4": "joint", "D5": "central_design_mde",
+                "D6": "commission_0_account_evidence", "D7": "swap_outside_primary"}
+}
+```
 
 ## Explicitly excluded
 

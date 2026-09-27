@@ -66,6 +66,7 @@ files as exported.
 - Quotes are identical across the seven screenshots (13:05-13:08 server,
   Sunday): these are Friday-close quotes.
 
-## Still required before freeze
+## Freeze (2026-09-27)
 
-- Account-owner decisions D1-D7 in `fx_session_persistence_v1.md`.
+- `fx_session_persistence_v1.md` is frozen with decisions D1-D7.
+- The archive is still unread at the freeze commit.
