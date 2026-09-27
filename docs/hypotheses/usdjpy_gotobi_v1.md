@@ -1,12 +1,19 @@
 # USDJPY Gotobi-Day Tokyo Fix v1
 
-Status: **DRAFT**, awaiting the account owner's decisions G1-G6 below.
-Nothing is frozen and no code exists. **No USDJPY price data before
-2021-01-04 has been read** (see the intake record below).
+Status: **FROZEN, version 1** (2026-09-27).
+- Decisions: G1 and G3-G6 approved; **G2 amended** by the account owner (no
+  February month-end event).
+- This freeze commit contains no code for this hypothesis. **No USDJPY price
+  data before 2021-01-04 has been read** (see the intake record below).
+- Chosen by the account owner from `next_candidates_2026-09.md` (candidate C).
 
-Chosen from `next_candidates_2026-09.md` (candidate C) as the recommended
-candidate. The account owner has confirmed the broker's history depth,
-but has not yet formally chosen C: approving this draft is that choice.
+The sequence from here, one commit (or more) per step:
+1. this freeze;
+2. implementation and synthetic-data tests;
+3. verify the quarantined CSV's sha256, then read it;
+4. run once;
+5. commit the result, the ledger row and the research log together;
+6. PR.
 
 ## Mechanism (stated before data)
 
@@ -41,10 +48,15 @@ grid, no parameter selection and no walk-forward selection.**
     the Dec 31 and Jan 1-3 bank closures. It holds 293 dates, sha256
     `3fc1131a9d7ea4ea7f02325b43c289cb161fa773695f96c5282814621ee400be`.
   - The calendar is fixed by that file, not by any library at run time.
-- **Gotobi day (G2):** each month's 5th, 10th, 15th, 20th and 25th, plus the
-  30th (or the last calendar day of February).
+- **Gotobi day (G2, as amended):** the 5th, 10th, 15th, 20th, 25th and 30th
+  of each calendar month.
   - A date that is not a Japanese bank business day rolls back to the
-    preceding business day.
+    preceding bank business day. The rolled day is still an event (for
+    example, a 25th that falls on a holiday becomes an event on the
+    preceding business day).
+  - **February has no 30th and so no sixth event.** Its last day is not an
+    event unless it is itself one of the listed dates, or one of them rolls
+    back onto it. No month-end rule exists.
   - If two dates roll to the same day, that day counts once.
 - **Trade (G1):** long USDJPY.
   - Market entry at the open of the 00:00 UTC bar (09:00 JST).
@@ -80,9 +92,11 @@ Test 17 used USDJPY.m from 2021-01-04 onward, and only traded London hours.
 2. **The placebo rules out a generic hour effect:** the mean *gross* return on
    gotobi days minus the mean gross return on placebo days must be > 0, with
    Welch t >= 2.
-3. **Stable over time:** net positive in >= 60% of calendar years
-   (2014-2020 are full years; the 2013 stub counts only if it has >= 30
-   events), and a median year > 0.
+3. **Stable over time:** net positive in >= 60% of calendar years, and a
+   median year > 0.
+   - The 2013 stub counts only if it has >= 30 events. By the calendar alone
+     it has 25, so it is excluded, leaving 2014-2020 (7 years).
+   - 60% of 7 years therefore means **at least 5 positive years**.
 4. **Survives 2x costs:** net mean > 0 at double spread and slippage.
 5. **Sample size:** at least 400 trades.
 
@@ -110,8 +124,12 @@ Descriptive only:
 
 ## Pre-data power
 
-- **Events (calendar only, no prices):** 526 gotobi days in the primary
-  sample and 411 in the secondary.
+- **Events (calendar only, no prices):** 519 gotobi days in the primary
+  sample and 405 in the secondary.
+  - These counts come **only** from the frozen holiday calendar and the G2
+    rule. They are not performance data.
+  - The run reports realized trade counts, which can be lower where bars
+    are missing.
 - **MDE formula:** MDE = 2.8416 x sd / sqrt(n), the one used for all prior
   power figures.
 - **Per-trade sd (assumption):** no USDJPY dispersion has been published in
@@ -119,14 +137,17 @@ Descriptive only:
   published EURUSD multi-hour sd of 23-34 bps, scaled to one hour, with a
   margin for JPY volatility.
 
-| sd (bps) | MDE primary (n = 526) | MDE secondary (n = 411) |
+| sd (bps) | MDE primary (n = 519) | MDE secondary (n = 405) |
 |---|---|---|
-| 8 | 0.99 | 1.12 |
-| 12 | 1.49 | 1.68 |
-| 15 | 1.86 | 2.10 |
+| 8 | 1.00 | 1.13 |
+| 12 | 1.50 | 1.69 |
+| 15 | 1.87 | 2.12 |
 
-- **Design requirement (proposed, G5):** the central MDE (sd 12) must be
-  <= 2 bps. It is 1.49 bps, so the requirement passes.
+- **Design requirement (G5):** the central MDE (sd 12) must be <= 2 bps. It
+  is 1.50 bps, so the requirement passes.
+  - This is an **assumption-based design estimate**, not an empirical
+    USDJPY volatility figure.
+  - Achieved resolution is reported after the run, descriptively only.
 - **Economic hurdle:** a net edge of about 1.5 bps needs a gross move of
   about 3.6 bps per event, because the round trip is about 2.1 bps.
   - The placebo rule is powered similarly: there are about 3x as many
@@ -147,16 +168,50 @@ export. The full file was uploaded instead. It is **quarantined unread**:
 
 At freeze, the file used must be byte-identical to this hash.
 
-## Decisions for the account owner
+## Decisions (account owner, 2026-09-27)
 
-| # | decision | recommendation |
+| # | decision | status |
 |---|---|---|
-| G1 | Window 00:00-01:00 UTC (09:00-10:00 JST), which contains the 09:55 fix plus 5 minutes after it. Alternative: 23:00-01:00 UTC (08:00-10:00 JST). | **00:00-01:00**. H1 cannot isolate 09:55. The one-hour bar is closest to the fix, and adding 08:00 JST dilutes it with pre-open drift. |
-| G2 | Gotobi set: 5/10/15/20/25/30 (Feb: last day), rolled back to the prior bank business day | **approve**, the standard market convention |
-| G3 | Primary = untouched 2013-08-26 to 2020-12-31; 2021-2026 descriptive only | **approve**, as required by the ledger rule |
-| G4 | Qualification rules 1-5 above, with the placebo difference t >= 2 replacing the drift control | **approve** |
-| G5 | Power requirement: central MDE <= 2 bps; sd 8-15 reported as sensitivity | **approve** |
-| G6 | Formally choose candidate C over A | **C** |
+| G1 | Window 00:00-01:00 UTC (09:00-10:00 JST) | **approved** |
+| G2 | Gotobi = 5/10/15/20/25/30, rolled back to the preceding bank business day; no February month-end event | **amended and approved** |
+| G3 | Primary = untouched 2013-08-26 to 2020-12-31; 2021-2026 descriptive only | **approved** |
+| G4 | Qualification rules 1-5 (placebo difference replaces the drift control) | **approved** |
+| G5 | Central MDE <= 2 bps (assumption-based); sd 8-15 as sensitivity | **approved** |
+| G6 | Candidate C chosen over A | **approved** |
+
+**Subjective prior (~15%, from the shortlist) has zero role.** It is a
+documented judgement from before the freeze. It is not an input to
+qualification, reporting or interpretation.
+
+## Frozen parameters
+
+```json
+{
+  "name": "usdjpy_gotobi",
+  "version": 1,
+  "status": "frozen",
+  "symbol": "USDJPY.m",
+  "data": {"file": "USDJPY.m_H1_201308230000_202609252300.csv",
+           "sha256": "578b734606f674bfef3ca6c8758a11335fecf2258ea550c9c15bef0f9633d05f",
+           "loader": {"tz": "Europe/Athens", "interval_hours": 1, "max_gap_days": 4, "trim_d1_prefix": true}},
+  "calendar": {"file": "docs/hypotheses/assets/jp_bank_holidays_2013_2026.json",
+               "sha256": "3fc1131a9d7ea4ea7f02325b43c289cb161fa773695f96c5282814621ee400be",
+               "gotobi_days": [5, 10, 15, 20, 25, 30], "roll": "preceding_bank_business_day",
+               "february_month_end_event": false, "dedupe": true},
+  "trade": {"side": "long", "entry_bar_utc": "00:00", "exit_bar_utc": "01:00", "fill": "bar_open",
+            "stop": null, "target": null, "requires_both_bars": true},
+  "costs": {"spread_floor": 0.025, "slippage_ratio_of_floor": 0.16666666666666666, "commission": 0.0,
+            "per_bar_spread_floor": true, "stress_multiplier": 2.0},
+  "samples": {"primary": ["2013-08-26", "2020-12-31"], "secondary": ["2021-01-04", "2026-09-25"],
+              "secondary_role": "descriptive_only"},
+  "primary": {"min_t": 2.0, "placebo_welch_t_min": 2.0, "placebo_statistic": "gross_gotobi_minus_gross_placebo",
+              "min_year_share": 0.6, "min_year_events": 30, "median_year_positive": true,
+              "stress_net_positive": true, "min_trades": 400},
+  "power": {"calendar_events_primary": 519, "calendar_events_secondary": 405, "design_mde_bps_central": 1.5,
+            "sd_assumption_bps": [8, 12, 15], "requirement_bps": 2.0},
+  "ledger": {"family_size_primary": 1, "adjustment": "confirmatory_untouched_data"}
+}
+```
 
 ## Explicitly excluded
 
