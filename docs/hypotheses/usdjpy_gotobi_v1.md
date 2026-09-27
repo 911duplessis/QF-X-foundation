@@ -1,6 +1,6 @@
 # USDJPY Gotobi-Day Tokyo Fix v1
 
-Status: **FROZEN, version 1** (2026-09-27).
+Status: **FROZEN, version 1** (2026-09-27): **blocked at Gate 0, see below; v2 amendment needed.**
 - Decisions: G1 and G3-G6 approved; **G2 amended** by the account owner (no
   February month-end event).
 - This freeze commit contains no code for this hypothesis. **No USDJPY price
@@ -212,6 +212,29 @@ qualification, reporting or interpretation.
   "ledger": {"family_size_primary": 1, "adjustment": "confirmatory_untouched_data"}
 }
 ```
+
+## Gate 0 stop (2026-09-27): design infeasible as frozen, no result exists
+
+What happened after the freeze (`6c4135d`), the code (`22931f9`) and the
+verified data install (`5809637`):
+- The **frozen loader's Gate 0 rejected the file**: gap_exceeds_max, a
+  104-day gap. The run stopped before any trade or statistic was computed.
+- To diagnose it, **only the date and time columns** were read. No price
+  column was read.
+- **Findings:**
+  - Before **2019-06-07 16:00 server time** the export contains **daily
+    bars, not H1**. The 2013 start in the file name covers daily history
+    only.
+  - There is one gap of more than 4 days: **2019-12-16 15:00 to 2020-03-30
+    00:00** server time (104 days).
+- **Consequence:** the untouched H1 sample (2019-06-10 to 2020-12-31,
+  excluding the gap) has **92** gotobi events by the calendar. That is below
+  the frozen minimum of 400 trades, and its central MDE of 3.56 bps is above
+  the 2 bps requirement.
+  - The v1 primary sample cannot be run as frozen.
+  - v1 is **not** reported as a result.
+  - Any continuation requires an approved **version 2** amendment, made
+    before any USDJPY price is read.
 
 ## Explicitly excluded
 
