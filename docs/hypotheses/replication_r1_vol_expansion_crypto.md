@@ -294,6 +294,32 @@ at 2021-01-01 00:00 server time (= 2020-12-31 22:00 UTC), which satisfies
 condition 4 by 2 hours. It shows the broker has H1 history at least that far
 back. Whether it goes further back does not affect eligibility.
 
+## Eligibility outcome (checkpoint 3, 2026-09-27)
+
+All 15 candidate exports were received. The rule was applied by
+`qfx.research.replication_eligibility` (data quality and history only; no
+returns, signals or strategy computation). Generated report:
+`docs/results/replication_r1_eligibility.md` (+ `.json`).
+
+**Eligible: N = 3: ETHUSD.m, LTCUSD.m, XRPUSD.m.**
+
+- History rule (first H1 <= 2021-01-01 UTC): passed by ETH, LTC, XRP and BCH.
+  The other 11 start 2022-06 or later.
+- **BCHUSD.m fails Gate 0 (unchanged):** `resolution_change` from a feed
+  outage on 2021-02-06/07 with six consecutive gaps: 2021-02-06 09:00->11:00 (+2h); 2021-02-06 13:00->15:00 (+2h); 2021-02-06 15:00->21:00 (+6h); 2021-02-06 22:00->00:00 (+2h); 2021-02-07 00:00->04:00 (+4h); 2021-02-07 04:00->08:00 (+4h).
+  The rule is not relaxed; BCH is excluded.
+- LINKUSD.m also fails Gate 0: a 1,129-day gap.
+- Eligible files stored at `data/mt5/replication_r1/` (sha256 in the report);
+  ineligible files are logged by hash only.
+- All three eligible series end at 2026-09-26 21:00 UTC, so the data-end rule
+  truncates nothing.
+
+Consequence, stated in advance of any result: with N = 3 highly correlated
+coins, the day-clustered t will have far fewer effective observations than
+the trade count suggests. A failure to replicate at N = 3 is weaker evidence
+against the BTC observation than a failure at larger N would be. A success
+still has to pass every rule.
+
 ## Explicitly forbidden
 
 - New parameter grid, compression threshold or lookback.

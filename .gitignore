@@ -15,3 +15,5 @@ data/*
 # Versioned research datasets (MT5 exports) are allowed under data/mt5/
 !data/mt5/
 !data/mt5/*.csv
+!data/mt5/replication_r1/
+!data/mt5/replication_r1/*.csv
