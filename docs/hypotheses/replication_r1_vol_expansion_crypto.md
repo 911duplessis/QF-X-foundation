@@ -107,6 +107,43 @@ time, stored at `assets/replication_r1_market_watch_quotes_2026-09-27.zip`
 | LINKUSD.m | 0.02 | 13.9 | 15 |
 | MATICUSD.m | 0.0006 | 49.9 | 15 |
 
+## Instrument metadata (recorded 2026-09-27)
+
+Source: MT5 Specification windows (JustMarkets, server "JustMarkets-Demo3",
+broker Just Global Markets Ltd.), screenshots stored at
+`assets/replication_r1_spec_*.png`. Values as displayed.
+
+| symbol | eligibility so far | digits | contract size | trade mode | quote sessions (server time) | margin rate |
+|---|---|---|---|---|---|---|
+| ETHUSD.m | passes history rule | 2 | 1 | Full access | 00:05-24:00 daily | 0.002 |
+| XRPUSD.m | passes history rule | 4 | 1,000 | Full access | 00:05-24:00 daily | 0.005 |
+| DOGEUSD.m | export pending | 5 | 10,000 | Full access | 00:00-24:00 daily | 0.05 |
+| SOLUSD.m | ineligible (history) | 2 | 100 | Full access | 00:00-24:00 daily | 0.05 |
+| DOTUSD.m | ineligible (history) | 3 | 100 | **Close only** | 00:00-24:00 daily | 0.05 |
+| ADAUSD.m | ineligible (history) | 4 | 1,000 | Full access | not captured | not captured |
+| LTCUSD.m | passes history rule | not captured | | | | |
+
+- **Common to all captured:**
+  - Exchange XCCC; calculation CFD; execution Market; filling Fill or Kill;
+  - volume 0.01 to 100, step 0.01;
+  - Sunday trading has a 10-minute break (00:09-00:19);
+  - tick size and tick value display as 0.
+- QF-X does not need contract size or tick value: returns and costs are in
+  price units and bps, where they cancel.
+- Commission is not shown in the specification.
+- **Swap: no swap section appears in any captured window** (no Swap type,
+  Swap long/short or 3-days swap rows). Financing status is **UNVERIFIED**
+  until the demo rollover check below.
+- Current trade mode (e.g. DOTUSD "Close only") is not an eligibility
+  criterion; eligibility is historical.
+
+**Financing verification (required before any strategy computation):** open
+0.01 lot ETHUSD.m on the demo account, hold it across one server rollover
+(00:00), and record the Swap column.
+- 0.00 -> financing = 0 for all replication symbols.
+- Non-zero -> the observed charge defines the rate and the weekend rule is
+  checked the same way across a Saturday rollover.
+
 ## Costs (rule-based, fixed before data)
 
 - **Spread floor:** the broker's quoted spread recorded at capture, in price
