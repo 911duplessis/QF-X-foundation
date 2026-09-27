@@ -1,6 +1,6 @@
 # FX Session Directional Persistence v1
 
-Status: **DRAFT**, awaiting the account owner's decisions D1-D7 below.
+Status: **DRAFT**. D1-D5 and D7 are approved; **D6 (commission) is pending and blocks the freeze**.
 Nothing is frozen, and no code exists for this hypothesis. **No FX price data
 has been read.** The seven-pair H1 archive is quarantined unread (see
 `fx_session_persistence_intake.md`). The pre-data power calculation below
@@ -64,24 +64,68 @@ walk-forward reported coarse **session breakdowns** of EURUSD trades
 
 ## Definitions (H1 bars; UTC internally)
 
-1. **Session anchor (D1):** London local time (Europe/London, DST-aware).
-   The session open is 08:00 London; the session end is 16:00 London.
-2. **Early window (grid K):** the K H1 bars starting at 08:00 London.
-3. **Displacement:** d = close of the last window bar - open of the first
-   window bar. Scale: s = ATR(24) x sqrt(K), with ATR(24) = the mean true
-   range of the 24 H1 bars ending at the bar before the window (causal).
-4. **Signal (grid theta):** |d| >= theta x s. Direction = sign(d). At most one
-   signal per pair per day. No signal if any window bar, the entry bar or the
-   ATR history is missing.
-5. **Entry:** market order at the open of the first bar after the window
-   (`delay_bars` = 1), paying half spread + slippage.
-6. **Protective stop (D3):** entry -/+ 2.0 x ATR(24) (long / short).
-   No profit target.
-7. **Exit:** at the open of the 16:00-London bar (time exit), or at the stop
-   if hit first. Pessimistic fills as in the bracket engine: stop first, gaps
-   fill at the open.
-   - The whole trade lies inside one London session and ends before the
-     22:00-server rollover, so **no swap is ever charged by construction**.
+These are implementation definitions, **not tuning parameters**.
+
+**Conventions**
+- An H1 bar is identified by its **open** time and covers [open, open + 1h).
+- Raw MT5 timestamps (server time, Europe/Athens) are converted to UTC by
+  the existing loader, then to London local time with
+  `zoneinfo("Europe/London")`. Hard-coded UTC or server hours are not allowed.
+  - Check, computed hourly over 2020-2026: Athens minus London is +2h at
+    every instant, because both follow the EU DST dates. So 08:00 London is
+    always 10:00 server time.
+  - The code still converts via the timezone database, and a test asserts
+    the mapping on both sides of each DST switch.
+- **Session day** = London calendar date, Monday-Friday. At most one signal
+  per pair per session day.
+
+**Timeline for session day D** (London local, bar open times)
+
+| role | bars | K = 1 | K = 2 |
+|---|---|---|---|
+| ATR history | the 24 bars immediately before the window (by bar count) | last opens 07:00 | last opens 07:00 |
+| observation window | the K bars opening at 08:00, ..., 08:00 + (K-1)h | 08:00 | 08:00, 09:00 |
+| signal evaluated | at the close of the last window bar | 09:00 | 10:00 |
+| entry fill | open of the bar opening at 08:00 + K h | 09:00 open | 10:00 open |
+| time-exit fill | open of the bar opening at 16:00 | 16:00 open | 16:00 open |
+
+The last bar held to its end is the 15:00 bar. The time exit fills at the
+16:00 bar's open with exit-side costs.
+
+1. **ATR causality (frozen):**
+   - ATR(24) = the arithmetic mean of the true ranges of the 24 available H1
+     bars immediately preceding the first window bar. The last of them is the
+     bar opening at 07:00 London, which closes at the window start.
+   - It **never includes any window bar, the entry bar or later bars**.
+   - True range uses the prior bar's close. On Monday the 24 bars reach back
+     into Friday (bar count, not clock time), so the weekend gap enters one
+     true range. That is accepted and fixed.
+   - The same ATR value is used for the threshold scale and for the stop.
+     It is computed once per signal and never updated.
+2. **Displacement:** d = close of the last window bar - open of the first
+   window bar (mid prices). Scale: s = ATR(24) x sqrt(K).
+3. **Signal (grid theta):** if |d| >= theta x s, go long when d > 0 and short
+   when d < 0. d = 0 gives no signal.
+4. **Eligibility (decided before data, by availability only, never by
+   price):** a day is skipped for a pair if any of these is missing:
+   - the bar opening at 08:00 London;
+   - any window bar;
+   - the entry bar;
+   - fewer than 25 bars of history.
+5. **Entry:** market order at the entry-fill bar open (`delay_bars` = 1, the
+   existing convention), paying half spread + slippage.
+6. **Protective stop (D3):** entry -/+ 2.0 x ATR(24) (long / short), active
+   from the entry bar onward. No profit target.
+7. **Exit:**
+   - **Time exit** at the open of the bar opening at 16:00 London.
+   - **Stop exit** first if hit, using the bracket engine's pessimistic
+     fills: stop first on a same-bar touch, and a gap through the stop fills
+     at the open.
+   - If the 16:00 bar is missing, the time exit fills at the open of the next
+     available bar. Every such case is counted and reported.
+   - **Swap:** all fills occur before 18:00 server time, so no position
+     crosses the 22:00 server rollover and **no swap is charged by
+     construction**. A test asserts this.
 
 ## Grid (D2): 4 combinations
 
@@ -141,10 +185,21 @@ Stop multiple, session times and exit are fixed; they are **not** in the grid.
 | all pessimistic | 40 | 0.7 | 0.25 | 3.80 |
 | EURUSD alone, central | 30 | - | 0.40 | 4.04 |
 
-- **Gate (D5):** the central estimate must be <= 3 bps (**met: 2.51**).
-- The design is **tight**: pessimistic combinations exceed 3 bps.
-- The realized MDE is reported after the run **descriptively only**. It
-  cannot change the verdict or the rules.
+**Design requirement (D5):** the pre-registered **central design MDE** must
+be <= 3 bps. It is **2.51 bps**, so the requirement passes.
+
+**Sensitivity analysis:** under pessimistic assumptions the MDE is
+3.35-3.80 bps.
+- This shows that resolution depends on the dispersion and correlation
+  assumptions.
+- It is **not** evidence that the design is robustly <= 3 bps. It must not be
+  described as "powered" in an unconditional sense.
+- It does not trigger a redesign.
+
+The MDE is a design quantity, not a prediction of the outcome. Achieved
+resolution (the realized clustered SE x 2.8416) is reported after the run,
+**descriptively only**. It cannot change the verdict, the rules or the
+qualification thresholds.
 
 ## Qualification (unchanged standards)
 
@@ -158,17 +213,17 @@ Every walk-forward rule on the pooled deployed track, with:
 
 Long / short and per-pair results are descriptive only.
 
-## Decisions for the account owner
+## Decisions (account owner, 2026-09-27)
 
-| # | decision | recommendation |
+| # | decision | status |
 |---|---|---|
-| D1 | Session anchor: London local (DST-aware) vs fixed UTC | **London local**: the session is defined by market hours, which move with DST |
-| D2 | Grid: K in {1, 2}, theta in {0.5, 1.0} (4 combinations) | **approve as is**; do not add |
-| D3 | Protective stop 2.0 x ATR(24), no target, time exit at 16:00 London | **approve**: no target keeps the test about persistence, not about the R-multiple |
-| D4 | Parameter selection pooled across pairs vs per pair | **pooled** (7x fewer degrees of freedom) |
-| D5 | Power gate on the central estimate <= 3 bps, pessimistic reported | **approve**; alternative: require the pessimistic <= 3 (fails now, which means redesign) |
-| D6 | Commission: confirm 0 for your account type | please confirm |
-| D7 | Swap: irrelevant by construction (all positions close before rollover) | **approve**; no financing model needed |
+| D1 | Session anchor: London local time, DST-aware via `Europe/London` | **approved** |
+| D2 | Grid: K in {1, 2}, theta in {0.5, 1.0}; no additions after results | **approved** |
+| D3 | 2.0 x ATR(24) stop, no target, time exit at the 16:00-London bar open (exact convention above) | **approved** |
+| D4 | One parameter set per window, selected jointly across all seven pairs | **approved** |
+| D5 | Central design MDE <= 3 bps as the formal requirement; pessimistic cases reported as sensitivity only | **approved with the wording above** |
+| D6 | Commission per lot for this account's FX instruments | **PENDING**: must be established from broker or account evidence, not assumed. It blocks the freeze. |
+| D7 | Swap outside the primary cost model (no position crosses rollover) | **approved** |
 
 ## Explicitly excluded
 
