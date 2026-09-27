@@ -9,6 +9,32 @@ Research sequence: rolling walk-forward (done) -> trend continuation (no demonst
 
 Language rule: results say "no demonstrated edge", never "does not work".
 
+## 2026-09 - Statistical resolution of the completed experiments (descriptive)
+
+Report: [power_analysis.md](power_analysis.md) (+ `.json`). Module `qfx.research.power`, committed before it was run.
+
+**Descriptive only.** Every verdict above stands; no rule, threshold or result is redefined. Per-trade data were reproduced from the frozen experiment code, and all 16 reproductions match their published pooled means exactly (the run asserts it).
+
+Design MDE = the smallest true mean edge per trade with an 80% chance of passing *all* qualification components. The components are t >= 2 (day-clustered), >= 60% of windows profitable, and drift p <= 0.05. Forced track, test segments.
+
+| instrument | bracket hypotheses (sweep, expansion) | trend continuation |
+|---|---|---|
+| EURUSD | 3.1-6.7 bps (2.5-5x cost) | 17.5 |
+| XAUUSD | 6.4-26.5 | 61.1 |
+| BTCUSD | 15.8-32.3 | 113.4 |
+| Replication pool (ETH+LTC+XRP) | 55.9 | - |
+
+- **Resolution depends mostly on the instrument's per-trade dispersion, not on the hypothesis.** EURUSD tests were sharp: a few-bps edge would very likely have been caught. BTC and gold tests only resolved edges of roughly 15-30+ bps/trade (4-20x costs). Trend continuation on BTC was close to blind.
+  - **Consequence for the verdicts:** EURUSD failures are strong evidence of no edge above ~4-7 bps there. BTC and gold failures only rule out large edges.
+- **The t >= 2 rule is the binding constraint almost everywhere.** The window rule needs about half the edge; the drift test is close to the t rule.
+- **The BTCUSD candidate never had a fair confirmation test.**
+  - If its observed +15.85 bps were the true edge, the discovery design had 34% power and the replication 12% power to pass t >= 2.
+  - The replication still carries information: its -26.27 bps is 2.14 SE below +15.85 (one-sided p = 0.016). The data are fairly inconsistent with an effect of that size.
+  - The closure stands, now with the reason made explicit.
+- **Why the replication pool was so coarse:** per-trade dispersion of 307 bps, driven by LTC and XRP trades carrying 60-168 bps costs, and a few window-level trade clusters.
+
+**Implication for the next design (a recommendation, not a finding):** hypotheses tested one instrument at a time on BTC, gold or altcoins at H1 can only detect implausibly large edges. The places where this framework has resolution are low-cost, low-dispersion instruments. EURUSD reached 3-7 bps; pooled FX majors with long broker history would plausibly reach ~2-3 bps. Risk-normalized (R) returns could further reduce dispersion from volatility regimes. Any such design must be pre-registered with its own power target *before* data are examined.
+
 ## 2026-09 - Replication R1: Volatility Expansion v1 (long) on the broker crypto universe
 
 Pre-registration trail:
