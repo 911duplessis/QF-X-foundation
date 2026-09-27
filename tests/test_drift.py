@@ -14,6 +14,7 @@ from qfx.backtest.types import Bar, ExecutionCosts, Side
 from qfx.research import sweep
 from qfx.research.drift import (
     CONFIG,
+    HYPOTHESIS_SIDES,
     SPEC_PATH,
     DriftConfig,
     Gates,
@@ -42,7 +43,8 @@ def test_code_matches_frozen_spec():
     assert "Status: **FROZEN**" in text
     spec = json.loads(re.search(r"```json\n(.*?)```", text, re.S).group(1))
     assert spec["version"] == 1
-    assert sorted(spec["applies_to"]) == sorted(sweep.HYPOTHESES)
+    # Extended 2026-09-27 (approved): volatility expansion added, method unchanged.
+    assert sorted(spec["applies_to"]) == sorted(HYPOTHESIS_SIDES)
     assert spec["track"] == CONFIG.track and spec["sampling"] == CONFIG.sampling
     assert spec["segments"] == list(CONFIG.segments)
     assert spec["repetitions"] == CONFIG.repetitions == 500

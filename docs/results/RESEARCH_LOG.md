@@ -3,11 +3,41 @@
 Interpretation of generated results. Files in this directory ending in `.md`/`.json`
 next to an experiment are generated and must not be hand-edited; conclusions live here.
 
-Research sequence: rolling walk-forward (done) -> trend continuation (no demonstrated edge) -> liquidity sweep/reversal (no demonstrated edge; no timing edge vs drift baseline)
+Research sequence: rolling walk-forward (done) -> trend continuation (no demonstrated edge) -> liquidity sweep/reversal (no demonstrated edge; no timing edge vs drift baseline) -> volatility expansion (not qualified; BTCUSD long candidate awaiting new data)
 -> volatility expansion -> regime-conditional combinations -> meta-engine
 -> portfolio/correlation -> shadow trading. No execution layer before shadow trading passes.
 
 Language rule: results say "no demonstrated edge", never "does not work".
+
+## 2026-09 - Volatility Expansion v1 (H1): walk-forward and drift control
+
+Specification frozen before implementation: [volatility_expansion_v1.md](../hypotheses/volatility_expansion_v1.md) (draft `fe4ebfe`, frozen `5feeb35`); implementation `2d93049` committed before any result.
+Reports: walk-forward [long](walkforward_vol_expansion_long.md) / [short](walkforward_vol_expansion_short.md); drift control [drift_baseline_v1_vol_expansion.md](drift_baseline_v1_vol_expansion.md) (+ `.json` for each).
+
+**Contamination disclosure (restated as the specification requires):** compression is a low-volatility condition, and a post-hoc observation that low-volatility trend entries did better was made earlier on these same 2023-2026 test windows. This hypothesis is not independent of that observation and its test windows were not fully untouched for volatility questions. The compression threshold (20th-percentile rank) and lookback (500 bars) were fixed before this run and were not tuned.
+
+**Verdict: no qualified hypothesis.** One candidate (BTCUSD long) needs confirmation on data this project has not yet seen.
+
+| direction | symbol | forced test trades | net bps/trade | walk-forward t | walk-forward (deployed) | drift control mean | vs drift p | qualified |
+|---|---|---|---|---|---|---|---|---|
+| long | BTCUSD | 211 | +15.85 | +1.61 | fails (t, concentration) | -3.41 | **0.044** | NO |
+| long | EURUSD | 225 | +0.67 | +0.30 | fails | -0.98 | 0.200 | NO |
+| long | XAUUSD | 159 | +21.51 | +2.31 | fails (concentration 52%; forced track passes) | **+13.64** | 0.174 | NO |
+| short | BTCUSD | 189 | +7.12 | +0.64 | fails | -6.21 | 0.132 | NO |
+| short | EURUSD | 207 | -1.53 | -0.64 | fails | -1.44 | 0.539 | NO |
+| short | XAUUSD | 189 | -11.69 | -2.23 | fails | -6.09 | 0.836 | NO |
+
+- **XAUUSD long is the case the drift control was built for.** On the forced track it passes every walk-forward rule: 159 trades, +21.5 bps/trade, t = 2.31, 71% of windows profitable, 71% surviving 2x costs, 46% concentration. Random-timed long gold trades with identical brackets, gates and costs earned +13.64 bps/trade over the same windows. The excess (+7.86) is not significant (p = 0.174). Most of the apparent edge is gold's drift. Without the control this would have looked like the first qualified strategy.
+- **BTCUSD long is the first p <= 0.05 against drift, and it still does not qualify.**
+  - For: it beat its matched random control in 5 of 6 test windows, with no window dominating (34% forced concentration).
+  - Against: walk-forward significance fails (forced t = 1.61, deployed t = 1.07), and deployed concentration is 55%. The secondary total-P&L p is 0.058.
+  - Multiple testing: with 6 comparisons in this run, the chance of at least one p <= 0.05 under the null is 26%, and p = 0.044 does not survive a Bonferroni threshold of 0.0083.
+  - Train and validation were also above the drift band (p = 0.020 and 0.040), but those segments are selection-biased and overlapping, so they add little.
+- **Mechanics verified.** Compression flags 20.8-22.1% of bars (a 20th-percentile rank rule); stop exits land at -1.02 to -1.04 R and 2R targets at +1.97 R; the cost gate removed ~38% of BTC setups (2021-22 spreads) and none elsewhere.
+- **Trade-count note.** Controls produced more trades than the hypothesis (for example 202 vs 159 for XAU long), because breakout signals cluster and the engine drops signals while a position is open. The primary statistic (mean per trade) is unaffected; total P&L p-values are reported as the secondary check and agree in direction.
+- **No parameter, filter or entry rule was changed after seeing these results.**
+
+**What would move BTCUSD long forward (not done; requires your decision):** a confirmation run of Volatility Expansion v1 **unchanged**, long BTCUSD only, on data after 2026-09-04 (the end of the current export), with the qualification rules and drift control fixed in advance. Re-testing on the existing data cannot confirm it. The existing data has been used, and any re-analysis of it becomes another comparison.
 
 ## 2026-09 - Drift Baseline v1: timing-shuffled control for Sweep Reversal v1
 

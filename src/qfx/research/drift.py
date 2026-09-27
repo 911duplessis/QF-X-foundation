@@ -4,8 +4,11 @@ Implements the frozen specification in ``docs/hypotheses/drift_baseline_v1.md``
 (a test fails if this module drifts from it). The control tests an
 already-defined hypothesis; it must never be used to choose its parameters.
 
-    python -m qfx.research.drift \
+    python -m qfx.research.drift --group sweep \
         --report docs/results/drift_baseline_v1.md --json docs/results/drift_baseline_v1.json
+    python -m qfx.research.drift --group expansion \
+        --report docs/results/drift_baseline_v1_vol_expansion.md \
+        --json docs/results/drift_baseline_v1_vol_expansion.json
 """
 from __future__ import annotations
 
@@ -22,11 +25,11 @@ from zoneinfo import ZoneInfo
 from ..backtest.bracket import BracketOrder, run_bracket_backtest
 from ..backtest.mt5 import DEFAULT_SERVER_TZ, load_mt5
 from ..backtest.types import Bar, ExecutionCosts, Side, Trade
-from . import sweep
+from . import expansion, sweep
 from .baseline import COSTS
 from .features import ewma_vol, log_returns
 from .splits import Segment
-from .walkforward import WalkForwardConfig, rolling_windows, run_walkforward, sweep_reversal_spec, to_jsonable
+from .walkforward import HYPOTHESIS_SPECS, WalkForwardConfig, rolling_windows, run_walkforward, to_jsonable
 
 SPEC_PATH = "docs/hypotheses/drift_baseline_v1.md"
 SCHEMA_VERSION = 1
@@ -46,6 +49,9 @@ class DriftConfig:
 
 
 CONFIG = DriftConfig()
+
+# Hypotheses the control applies to (the frozen specification's applies_to).
+HYPOTHESIS_SIDES: dict[str, Side] = {**sweep.HYPOTHESES, **expansion.HYPOTHESES}
 
 
 # --- gates and templates -----------------------------------------------------
@@ -244,23 +250,21 @@ def run_segment(
 def evaluate_symbol(
     hypothesis: str, symbol: str, bars: Sequence[Bar], costs: ExecutionCosts, wf: WalkForwardConfig = WalkForwardConfig(), cfg: DriftConfig = CONFIG
 ) -> dict:
-    side = sweep.HYPOTHESES[hypothesis]
-    report = run_walkforward(symbol, bars, sweep_reversal_spec(hypothesis), costs, wf)
+    side = HYPOTHESIS_SIDES[hypothesis]
+    spec = HYPOTHESIS_SPECS[hypothesis]()
+    report = run_walkforward(symbol, bars, spec, costs, wf)
     windows = rolling_windows([b.timestamp for b in bars], wf)
     assert len(windows) == len(report.windows)
     gates = Gates.for_bars(bars, costs)
-    setups_cache: dict[tuple, list] = {}
+    make = spec.bind(bars)
     per_window, pooled_runs = [], {s: [] for s in cfg.segments}
     for w, res in zip(windows, report.windows):
         p = res.params  # forced-track parameters already selected in this window
-        key = (p["swing_lookback"], p["confirmation"])
-        if key not in setups_cache:
-            setups_cache[key] = sweep.find_setups(bars, side, *key)
         segs = {"train": w.train, "validation": w.validation, "test": w.test}
         out = {}
         for name in cfg.segments:
             seg = segs[name]
-            signal = sweep.sweep_signal(bars, setups_cache[key], side, p["target_r"], costs, seg.start)
+            signal = make(p, seg.start, costs)
             run = run_segment(bars, seg, signal, side, p["target_r"], gates, (hypothesis, symbol, w.index, name), cfg)
             out[name] = compare(run.observed, run.control, run.dropped, run.templates, cfg)
             pooled_runs[name].append(run)
@@ -297,9 +301,16 @@ def q2_timing(test: Comparison, cfg: DriftConfig = CONFIG) -> str:
 # --- output ---------------------------------------------------------------------
 
 
-def render(results: dict, cfg: DriftConfig = CONFIG) -> str:
+TITLES = {
+    "sweep": "Liquidity Sweep Reversal v1",
+    "expansion": "Volatility Expansion v1",
+}
+GROUPS = {"sweep": sorted(sweep.HYPOTHESES), "expansion": sorted(expansion.HYPOTHESES)}
+
+
+def render(results: dict, cfg: DriftConfig = CONFIG, subject: str = TITLES["sweep"]) -> str:
     L = [
-        "# Drift Baseline v1: timing-shuffled control for Liquidity Sweep Reversal v1",
+        f"# Drift Baseline v1: timing-shuffled control for {subject}",
         "",
         f"Specification (frozen before implementation): `{SPEC_PATH}`. One-sided empirical randomization test, "
         f"{cfg.repetitions} hour-matched repetitions per window and segment, forced-track parameters. "
@@ -344,13 +355,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data", default="data/mt5")
     parser.add_argument("--report", default=None)
     parser.add_argument("--json", default=None)
+    parser.add_argument("--group", default="sweep", choices=sorted(GROUPS))
     args = parser.parse_args(argv)
     loaded = [load_mt5(p, ZoneInfo(DEFAULT_SERVER_TZ)) for p in sorted(Path(args.data).glob("*.csv"))]
     results = {
         hyp: {l.symbol: evaluate_symbol(hyp, l.symbol, l.bars, COSTS[l.symbol]) for l in loaded if l.symbol in COSTS}
-        for hyp in sorted(sweep.HYPOTHESES)
+        for hyp in GROUPS[args.group]
     }
-    text = render(results)
+    text = render(results, subject=TITLES[args.group])
     print(text)
     payload = to_jsonable({"schema_version": SCHEMA_VERSION, "spec": SPEC_PATH, "config": CONFIG, "results": results})
     for target, content in ((args.report, text), (args.json, json.dumps(payload, indent=2) + "\n")):

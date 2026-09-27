@@ -16,6 +16,11 @@ itself produces. A hypothesis only shows timing value if it beats that.
 
 ## Scope
 
+Extension record: on 2026-09-27 `vol_expansion_long` and `vol_expansion_short`
+were added to `applies_to` (approved as an extension, not a new version). The
+method, parameters and p-value rule are unchanged. For every hypothesis, ATR
+units use ATR(24), the simple mean of the last 24 true ranges.
+
 - Bracket hypotheses: `sweep_reversal_long` and `sweep_reversal_short` (v1,
   evaluated retroactively; their results and verdicts do not change), and every
   future bracket hypothesis.
@@ -120,7 +125,7 @@ Reversal v1 is not re-qualified, since it already fails.
 {
   "name": "drift_baseline",
   "version": 1,
-  "applies_to": ["sweep_reversal_long", "sweep_reversal_short"],
+  "applies_to": ["sweep_reversal_long", "sweep_reversal_short", "vol_expansion_long", "vol_expansion_short"],
   "track": "forced",
   "segments": ["train", "validation", "test"],
   "sampling": "hour_matched",

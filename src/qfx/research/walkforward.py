@@ -41,7 +41,7 @@ from ..backtest.bracket import run_bracket_backtest
 from ..backtest.engine import Signal, run_backtest
 from ..backtest.mt5 import DEFAULT_SERVER_TZ, load_mt5
 from ..backtest.types import Bar, ExecutionCosts, Trade
-from . import sweep
+from . import expansion, sweep
 from .baseline import COSTS, GRID
 from .evaluation import Stats, trade_stats
 from .hypotheses import TrendParams, trend_continuation, trend_features
@@ -107,9 +107,31 @@ def sweep_reversal_spec(name: str) -> HypothesisSpec:
     return HypothesisSpec(name, sweep.grid(), bind, _bracket_engine, sweep.SPEC_PATH)
 
 
+def vol_expansion_spec(name: str) -> HypothesisSpec:
+    """Volatility Expansion v1 for one direction (frozen specification)."""
+    side = expansion.HYPOTHESES[name]
+
+    def bind(bars: Sequence[Bar]) -> SignalFactory:
+        flags: dict[int, list[bool]] = {}
+        setups: dict[tuple, list] = {}
+
+        def make(p: dict, offset: int, costs: ExecutionCosts) -> Callable:
+            n, stop = p["box_bars"], p["stop"]
+            if n not in flags:
+                flags[n] = expansion.compression_flags(bars, n)
+            if (n, stop) not in setups:
+                setups[(n, stop)] = expansion.find_setups(bars, side, n, stop, flags=flags[n])
+            return expansion.expansion_signal(bars, setups[(n, stop)], side, p["target_r"], costs, offset)
+
+        return make
+
+    return HypothesisSpec(name, expansion.grid(), bind, _bracket_engine, expansion.SPEC_PATH)
+
+
 HYPOTHESIS_SPECS: dict[str, Callable[[], HypothesisSpec]] = {
     "trend_continuation": trend_continuation_spec,
     **{name: (lambda n=name: sweep_reversal_spec(n)) for name in sweep.HYPOTHESES},
+    **{name: (lambda n=name: vol_expansion_spec(n)) for name in expansion.HYPOTHESES},
 }
 
 
