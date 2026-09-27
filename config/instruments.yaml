@@ -1,0 +1,16 @@
+instruments:
+  EURUSD:
+    macro_timeframes: [1D, 4H]
+    regime_timeframes: [4H, 1H]
+    setup_timeframes: [15M, 5M]
+    focus: [structure, liquidity, sessions, usd_rates, volatility, spread]
+  XAUUSD:
+    macro_timeframes: [1D, 4H]
+    regime_timeframes: [4H, 1H]
+    setup_timeframes: [15M, 5M]
+    focus: [usd, real_yields, liquidity, volatility, sessions]
+  BTCUSD:
+    macro_timeframes: [1D, 4H]
+    regime_timeframes: [4H, 1H]
+    setup_timeframes: [15M, 5M]
+    focus: [liquidity, realized_volatility, derivatives, macro, 24_7_sessions]
