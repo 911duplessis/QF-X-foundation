@@ -36,9 +36,32 @@ The objective is not maximum trade frequency. The objective is a repeatable cond
 | `expectancy` | EV gate after costs, with minimum sample size |
 | `sizing` | Instrument-aware position sizing, always rounds down |
 | `risk` | Hard limits and kill switches; correlated exposure shares the open-risk limit |
+| `backtest` | Gate 2 harness: delayed fills, per-bar spread (floor), commission, slippage; no look-ahead |
+| `backtest.mt5` | MT5 export loader: server time -> UTC, spread points -> price, D1 prefix trimming, Gate 0 |
+| `research` | Causal features, hypotheses, chronological splits, rolling walk-forward with stability metrics, qualification rules, JSON + markdown reports |
 | `pipeline` | DATA QUALITY -> REGIME -> VOLATILITY -> EDGE -> RISK -> research decision (default NO_TRADE) |
 
 Run tests: `pip install -e .[test] && pytest`
+
+## Data
+
+`data/mt5/` holds MT5 H1 exports (EURUSD, XAUUSD, BTCUSD). Audit them with:
+
+    python -m qfx.backtest.audit data/mt5/*.csv
+
+Verified properties of these exports:
+
+- Broker server time is `Europe/Athens` (EET/EEST, EU DST dates): the FX week opens at Sun 17:00 New York in all non-holiday weeks.
+- Each file begins with ~7-10 months of D1 bars before H1 history starts; the loader trims and reports them.
+- BTCUSD (24/7) has one ambiguous bar per spring DST switch; the loader drops it and reports the count.
+- `<SPREAD>` is the bar's quoted spread in points; the engine uses it only as a floor above the configured spread.
+
+## Research results
+
+Interpretation lives in the [research log](docs/results/RESEARCH_LOG.md); generated reports sit next to it.
+
+- [Walk-forward: trend continuation (H1)](docs/results/walkforward_trend_continuation.md) (+ `.json`): **no demonstrated edge** on EURUSD, XAUUSD or BTCUSD across 6-7 rolling test windows each. Reproduce with `python -m qfx.research.walkforward --report docs/results/walkforward_trend_continuation.md --json docs/results/walkforward_trend_continuation.json`.
+- [Baseline: trend continuation (H1)](docs/results/baseline_trend_continuation.md): single split, superseded by the walk-forward. Reproduce with `python -m qfx.research.baseline --report docs/results/baseline_trend_continuation.md`.
 
 ## Design principle
 
