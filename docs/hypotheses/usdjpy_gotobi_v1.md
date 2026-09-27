@@ -1,6 +1,10 @@
 # USDJPY Gotobi-Day Tokyo Fix v1
 
-Status: **FROZEN, version 1** (2026-09-27): **blocked at Gate 0, see below; v2 amendment needed.**
+Status: **FROZEN, version 2** (2026-09-27). v1 was frozen at `6c4135d` and blocked at
+Gate 0. **The v2 amendment below overrides the v1 Samples, Primary outcome,
+Ledger and Power sections wherever they conflict.** It was approved by the
+account owner (option A) **before any USDJPY price was read**. The only
+data-derived inputs to v2 are bar timestamps: the H1 start and the gap.
 - Decisions: G1 and G3-G6 approved; **G2 amended** by the account owner (no
   February month-end event).
 - This freeze commit contains no code for this hypothesis. **No USDJPY price
@@ -14,6 +18,52 @@ The sequence from here, one commit (or more) per step:
 4. run once;
 5. commit the result, the ledger row and the research log together;
 6. PR.
+
+## Version 2 amendment (approved 2026-09-27, before any price was read)
+
+**Why:** the broker's USDJPY export is H1 only from 2019-06-07 16:00 server
+time. Earlier bars are daily, and there is a 104-day gap (see "Gate 0 stop"
+below). The untouched pre-2021 H1 sample has only 92 events, so the v1
+primary sample is infeasible.
+
+**Changes. Everything not listed is unchanged:** mechanism, hour, gotobi
+rule (G2 as amended), costs, placebo, 2x stress and >= 400 trades.
+
+1. **Primary sample:** all H1 data, 2019-06-10 to 2026-09-25 (the first full
+   week after the H1 start, to the end of the file).
+   - Days 2019-12-17 to 2020-03-29 are excluded. They fall inside the gap,
+     which runs from 2019-12-16 13:00 UTC to 2020-03-29 21:00 UTC. Gotobi and
+     placebo days alike are excluded.
+   - There is **no secondary sample**. The 2019-06 to 2020 (untouched) and
+     2021-2026 (overlapping test 17) sub-periods are reported descriptively.
+2. **Multiplicity (ledger option 1):**
+   - The USDJPY H1 data 2021-2026 was read by test 17. That test traded only
+     07:00-16:00 London and never the 00:00 UTC hour, but the true ranges of
+     the 00:00-01:00 UTC bars entered its ATR history.
+   - The family on this data is therefore 2 tests. Both t-gates (net t and
+     placebo Welch t) are raised to a **Bonferroni-adjusted t >= 2.28**, i.e.
+     one-sided alpha 0.0114, half of the alpha of t >= 2.
+3. **Year rule:** unchanged (>= 60% of counted years, each with >= 30 events;
+   median year > 0).
+   - By the calendar, 2019 has 38 events and 2026 has 52, so all 8 years
+     2019-2026 count.
+   - **At least 5 of 8 years** must be positive.
+4. **Data gate:**
+   - The frozen loader is used with its 4-day gap limit relaxed for **exactly
+     one documented gap** (2019-12-16 13:00 UTC to 2020-03-29 21:00 UTC).
+   - The run asserts that no other gap exceeds 4 days, and fails otherwise.
+   - The daily-bar prefix is trimmed by the existing loader rule.
+5. **Power (calendar only):**
+   - 498 events.
+   - MDE = (2.28 + 0.8416) x sd / sqrt(498) = **1.68 bps** at sd 12, the
+     central assumption; 1.12-2.10 bps across sd 8-15.
+   - That meets the <= 2 bps requirement (G5). It remains an assumption-based
+     design estimate.
+6. **Ledger section (v2):**
+   - Overlap: test 17 (USDJPY.m 2021-2026, other hours).
+   - Family size: 2.
+   - Adjustment: Bonferroni, t >= 2.28 on both t-gates.
+   - The ledger row is committed with the result.
 
 ## Mechanism (stated before data)
 
@@ -188,28 +238,110 @@ qualification, reporting or interpretation.
 ```json
 {
   "name": "usdjpy_gotobi",
-  "version": 1,
+  "version": 2,
   "status": "frozen",
   "symbol": "USDJPY.m",
-  "data": {"file": "USDJPY.m_H1_201308230000_202609252300.csv",
-           "sha256": "578b734606f674bfef3ca6c8758a11335fecf2258ea550c9c15bef0f9633d05f",
-           "loader": {"tz": "Europe/Athens", "interval_hours": 1, "max_gap_days": 4, "trim_d1_prefix": true}},
-  "calendar": {"file": "docs/hypotheses/assets/jp_bank_holidays_2013_2026.json",
-               "sha256": "3fc1131a9d7ea4ea7f02325b43c289cb161fa773695f96c5282814621ee400be",
-               "gotobi_days": [5, 10, 15, 20, 25, 30], "roll": "preceding_bank_business_day",
-               "february_month_end_event": false, "dedupe": true},
-  "trade": {"side": "long", "entry_bar_utc": "00:00", "exit_bar_utc": "01:00", "fill": "bar_open",
-            "stop": null, "target": null, "requires_both_bars": true},
-  "costs": {"spread_floor": 0.025, "slippage_ratio_of_floor": 0.16666666666666666, "commission": 0.0,
-            "per_bar_spread_floor": true, "stress_multiplier": 2.0},
-  "samples": {"primary": ["2013-08-26", "2020-12-31"], "secondary": ["2021-01-04", "2026-09-25"],
-              "secondary_role": "descriptive_only"},
-  "primary": {"min_t": 2.0, "placebo_welch_t_min": 2.0, "placebo_statistic": "gross_gotobi_minus_gross_placebo",
-              "min_year_share": 0.6, "min_year_events": 30, "median_year_positive": true,
-              "stress_net_positive": true, "min_trades": 400},
-  "power": {"calendar_events_primary": 519, "calendar_events_secondary": 405, "design_mde_bps_central": 1.5,
-            "sd_assumption_bps": [8, 12, 15], "requirement_bps": 2.0},
-  "ledger": {"family_size_primary": 1, "adjustment": "confirmatory_untouched_data"}
+  "data": {
+    "file": "USDJPY.m_H1_201308230000_202609252300.csv",
+    "sha256": "578b734606f674bfef3ca6c8758a11335fecf2258ea550c9c15bef0f9633d05f",
+    "loader": {
+      "tz": "Europe/Athens",
+      "interval_hours": 1,
+      "max_gap_days": 4,
+      "trim_d1_prefix": true
+    },
+    "documented_gap_utc": [
+      "2019-12-16T13:00:00Z",
+      "2020-03-29T21:00:00Z"
+    ]
+  },
+  "calendar": {
+    "file": "docs/hypotheses/assets/jp_bank_holidays_2013_2026.json",
+    "sha256": "3fc1131a9d7ea4ea7f02325b43c289cb161fa773695f96c5282814621ee400be",
+    "gotobi_days": [
+      5,
+      10,
+      15,
+      20,
+      25,
+      30
+    ],
+    "roll": "preceding_bank_business_day",
+    "february_month_end_event": false,
+    "dedupe": true
+  },
+  "trade": {
+    "side": "long",
+    "entry_bar_utc": "00:00",
+    "exit_bar_utc": "01:00",
+    "fill": "bar_open",
+    "stop": null,
+    "target": null,
+    "requires_both_bars": true
+  },
+  "costs": {
+    "spread_floor": 0.025,
+    "slippage_ratio_of_floor": 0.16666666666666666,
+    "commission": 0.0,
+    "per_bar_spread_floor": true,
+    "stress_multiplier": 2.0
+  },
+  "samples": {
+    "primary": [
+      "2019-06-10",
+      "2026-09-25"
+    ],
+    "excluded_days": [
+      "2019-12-17",
+      "2020-03-29"
+    ],
+    "descriptive_subperiods": [
+      [
+        "2019-06-10",
+        "2020-12-31"
+      ],
+      [
+        "2021-01-04",
+        "2026-09-25"
+      ]
+    ]
+  },
+  "primary": {
+    "min_t": 2.28,
+    "placebo_welch_t_min": 2.28,
+    "placebo_statistic": "gross_gotobi_minus_gross_placebo",
+    "min_year_share": 0.6,
+    "min_year_events": 30,
+    "median_year_positive": true,
+    "stress_net_positive": true,
+    "min_trades": 400
+  },
+  "power": {
+    "calendar_events_primary": 498,
+    "design_mde_bps_central": 1.68,
+    "sd_assumption_bps": [
+      8,
+      12,
+      15
+    ],
+    "requirement_bps": 2.0,
+    "t_threshold": 2.28
+  },
+  "ledger": {
+    "family_size": 2,
+    "overlap": [
+      "fx_session_persistence_v1"
+    ],
+    "adjustment": "bonferroni_t_2.28"
+  },
+  "amendments": [
+    {
+      "version": 2,
+      "date": "2026-09-27",
+      "change": "primary = all H1 2019-06-10..2026-09-25 excl. gap days 2019-12-17..2020-03-29; Bonferroni t>=2.28 (family 2); one documented gap allowed",
+      "made_before": "any USDJPY price was read (timestamps only)"
+    }
+  ]
 }
 ```
 
