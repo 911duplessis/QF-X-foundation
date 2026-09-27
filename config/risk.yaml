@@ -1,0 +1,9 @@
+risk:
+  baseline_fraction: 0.0025
+  maximum_fraction: 0.0035
+  abnormal_fraction: 0.0010
+  max_open_risk: 0.01
+  max_daily_loss: 0.015
+  martingale: false
+  uncontrolled_averaging_down: false
+  unbounded_pyramiding: false
