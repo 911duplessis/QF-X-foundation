@@ -46,6 +46,12 @@ class Trade:
     gross_pnl: float
     costs: float
     net_pnl: float
+    # Mid prices before spread/slippage; gross mid-to-mid P&L isolates cost drag.
+    mid_entry: float | None = None
+    mid_exit: float | None = None
+    stop_price: float | None = None
+    exit_reason: str = "signal"
+    r_multiple: float | None = None  # net P&L / initial risk, for stop-based trades
 
     @property
     def return_fraction(self) -> float:

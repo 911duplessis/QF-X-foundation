@@ -1,6 +1,6 @@
 """Rolling walk-forward evaluation.
 
-    python -m qfx.research.walkforward \
+    python -m qfx.research.walkforward --hypothesis trend_continuation \
         --report docs/results/walkforward_trend_continuation.md \
         --json docs/results/walkforward_trend_continuation.json
 
@@ -37,9 +37,11 @@ from pathlib import Path
 from statistics import median, pstdev, quantiles
 from zoneinfo import ZoneInfo
 
+from ..backtest.bracket import run_bracket_backtest
 from ..backtest.engine import Signal, run_backtest
 from ..backtest.mt5 import DEFAULT_SERVER_TZ, load_mt5
 from ..backtest.types import Bar, ExecutionCosts, Trade
+from . import sweep
 from .baseline import COSTS, GRID
 from .evaluation import Stats, trade_stats
 from .hypotheses import TrendParams, trend_continuation, trend_features
@@ -47,7 +49,14 @@ from .splits import Segment
 
 SCHEMA_VERSION = 1
 
-SignalFactory = Callable[[dict, int], Signal]  # (params, offset) -> fresh Signal
+SignalFactory = Callable[[dict, int, ExecutionCosts], Callable]  # (params, offset, costs) -> fresh signal
+
+
+Engine = Callable[[Sequence[Bar], Callable, ExecutionCosts], list[Trade]]
+
+
+def _signal_engine(bars: Sequence[Bar], signal: Callable, costs: ExecutionCosts) -> list[Trade]:
+    return run_backtest(bars, signal, costs=costs)
 
 
 @dataclass(frozen=True)
@@ -55,13 +64,15 @@ class HypothesisSpec:
     name: str
     grid: tuple[dict, ...]
     bind: Callable[[Sequence[Bar]], SignalFactory]
+    engine: Engine = _signal_engine
+    spec_doc: str | None = None  # frozen pre-registration, when one exists
 
 
 def trend_continuation_spec() -> HypothesisSpec:
     def bind(bars: Sequence[Bar]) -> SignalFactory:
         cache: dict[tuple, object] = {}
 
-        def make(p: dict, offset: int) -> Signal:
+        def make(p: dict, offset: int, costs: ExecutionCosts) -> Signal:
             params = TrendParams(**p)
             key = tuple(sorted(p.items()))
             if key not in cache:
@@ -72,6 +83,34 @@ def trend_continuation_spec() -> HypothesisSpec:
 
     grid = tuple({"lookback": lb, "entry_z": z} for lb, z in product(GRID["lookback"], GRID["entry_z"]))
     return HypothesisSpec("trend_continuation", grid, bind)
+
+
+def _bracket_engine(bars: Sequence[Bar], signal: Callable, costs: ExecutionCosts) -> list[Trade]:
+    return run_bracket_backtest(bars, signal, costs=costs)
+
+
+def sweep_reversal_spec(name: str) -> HypothesisSpec:
+    """Liquidity Sweep Reversal v1 for one direction (frozen specification)."""
+    side = sweep.HYPOTHESES[name]
+
+    def bind(bars: Sequence[Bar]) -> SignalFactory:
+        cache: dict[tuple, list] = {}
+
+        def make(p: dict, offset: int, costs: ExecutionCosts) -> Callable:
+            key = (p["swing_lookback"], p["confirmation"])
+            if key not in cache:
+                cache[key] = sweep.find_setups(bars, side, *key)
+            return sweep.sweep_signal(bars, cache[key], side, p["target_r"], costs, offset)
+
+        return make
+
+    return HypothesisSpec(name, sweep.grid(), bind, _bracket_engine, sweep.SPEC_PATH)
+
+
+HYPOTHESIS_SPECS: dict[str, Callable[[], HypothesisSpec]] = {
+    "trend_continuation": trend_continuation_spec,
+    **{name: (lambda n=name: sweep_reversal_spec(n)) for name in sweep.HYPOTHESES},
+}
 
 
 @dataclass(frozen=True)
@@ -138,19 +177,18 @@ def rolling_windows(timestamps: Sequence[datetime], cfg: WalkForwardConfig) -> l
 @dataclass
 class SegmentRun:
     trades: list[Trade]
-    ideal: list[Trade]
     hours: float
     stats: Stats
 
 
-def run_segment(
-    bars: Sequence[Bar], clean: Sequence[Bar], seg: Segment, make: SignalFactory, params: dict, costs: ExecutionCosts
-) -> SegmentRun:
+def run_segment(bars: Sequence[Bar], seg: Segment, spec: "HypothesisSpec", make: SignalFactory, params: dict, costs: ExecutionCosts) -> SegmentRun:
+    """Cost drag comes from each trade's recorded mid prices, so no separate
+    frictionless run is needed (and bracket hypotheses, whose cost gate can
+    change which trades happen, stay comparable)."""
     part = bars[seg.start : seg.end]
     hours = (part[-1].timestamp - part[0].timestamp).total_seconds() / 3600
-    trades = run_backtest(part, make(params, seg.start), costs=costs)
-    ideal = run_backtest(clean[seg.start : seg.end], make(params, seg.start), costs=ExecutionCosts())
-    return SegmentRun(trades, ideal, hours, trade_stats(trades, ideal, hours))
+    trades = spec.engine(part, make(params, seg.start, costs), costs)
+    return SegmentRun(trades, hours, trade_stats(trades, None, hours))
 
 
 # --- descriptive context labels (not used for selection) --------------------
@@ -179,7 +217,9 @@ def breakdown(trades: Sequence[Trade], ctx: Context, train: Segment) -> dict[str
     the window's own train period, and trending (|z168| >= 1) vs ranging."""
     train_vol = sorted(v for v in ctx.vol[train.start : train.end] if v == v)
     lo, hi = (quantiles(train_vol, n=3) if len(train_vol) >= 3 else (math.inf, math.inf))
-    groups: dict[str, dict[str, list[float]]] = {"session": defaultdict(list), "vol_regime": defaultdict(list), "trend_regime": defaultdict(list)}
+    groups: dict[str, dict[str, list[float]]] = {
+        "session": defaultdict(list), "vol_regime": defaultdict(list), "trend_regime": defaultdict(list), "exit": defaultdict(list)
+    }
     for t in trades:
         i = ctx.index[t.entry_time]
         bps = t.net_pnl / t.entry_price * 1e4
@@ -187,6 +227,7 @@ def breakdown(trades: Sequence[Trade], ctx: Context, train: Segment) -> dict[str
         groups["session"][session_of(t.entry_time)].append(bps)
         groups["vol_regime"]["low" if v <= lo else "normal" if v <= hi else "high"].append(bps)
         groups["trend_regime"]["trending" if z == z and abs(z) >= 1.0 else "ranging"].append(bps)
+        groups["exit"][t.exit_reason].append(bps)
     return {
         dim: {label: {"trades": len(xs), "net_bps": sum(xs) / len(xs), "total_bps": sum(xs)} for label, xs in sorted(g.items())}
         for dim, g in groups.items()
@@ -224,7 +265,6 @@ def stress(bars: Sequence[Bar], costs: ExecutionCosts, k: float) -> tuple[list[B
 def evaluate_window(
     w: Window,
     bars: Sequence[Bar],
-    clean: Sequence[Bar],
     stressed: tuple[Sequence[Bar], ExecutionCosts],
     make: SignalFactory,
     spec: HypothesisSpec,
@@ -232,12 +272,12 @@ def evaluate_window(
     ctx: Context,
     cfg: WalkForwardConfig,
 ) -> WindowResult:
-    train_runs = [(p, run_segment(bars, clean, w.train, make, p, costs)) for p in spec.grid]
+    train_runs = [(p, run_segment(bars, w.train, spec, make, p, costs)) for p in spec.grid]
     eligible = [(p, r) for p, r in train_runs if r.stats.trades >= cfg.min_train_trades and r.stats.net_bps > 0]
 
     reason = ""
     if eligible:
-        val_runs = [(p, tr, run_segment(bars, clean, w.validation, make, p, costs)) for p, tr in eligible]
+        val_runs = [(p, tr, run_segment(bars, w.validation, spec, make, p, costs)) for p, tr in eligible]
         enough = [x for x in val_runs if x[2].stats.trades >= cfg.min_validation_trades]
         params, train_run, val_run = max(enough or val_runs, key=lambda x: x[2].stats.net_bps)
         if not enough:
@@ -247,12 +287,12 @@ def evaluate_window(
     else:
         # Nothing passes train: the forced track still measures the train-best.
         params, train_run = max(train_runs, key=lambda x: x[1].stats.net_bps)
-        val_run = run_segment(bars, clean, w.validation, make, params, costs)
+        val_run = run_segment(bars, w.validation, spec, make, params, costs)
         reason = "no candidate passed train screen"
 
-    test_run = run_segment(bars, clean, w.test, make, params, costs)
+    test_run = run_segment(bars, w.test, spec, make, params, costs)
     s_bars, s_costs = stressed
-    stressed_run = run_segment(s_bars, clean, w.test, make, params, s_costs)
+    stressed_run = run_segment(s_bars, w.test, spec, make, params, s_costs)
     return WindowResult(
         index=w.index,
         periods={name: _period(bars, seg) for name, seg in (("train", w.train), ("validation", w.validation), ("test", w.test))},
@@ -291,16 +331,12 @@ class Stability:
 
 
 def _pool(results: Sequence[WindowResult], key: str) -> Stats:
-    trades, ideal, hours = [], [], 0.0
+    trades, hours = [], 0.0
     for r in results:
         run = r._runs[key]
         trades += run.trades
-        ideal += run.ideal
         hours += run.hours
-    # Stressed runs share entries/exits with the frictionless test run.
-    if key == "stressed":
-        ideal = [t for r in results for t in r._runs["test"].ideal]
-    return trade_stats(trades, ideal, hours)
+    return trade_stats(trades, None, hours)
 
 
 def stability(results: Sequence[WindowResult], deployed_only: bool) -> Stability:
@@ -385,12 +421,11 @@ def merge_breakdowns(results: Sequence[WindowResult]) -> dict:
 def run_walkforward(
     symbol: str, bars: Sequence[Bar], spec: HypothesisSpec, costs: ExecutionCosts, cfg: WalkForwardConfig = WalkForwardConfig()
 ) -> SymbolReport:
-    clean = [replace(b, spread=None) for b in bars]
     stressed = stress(bars, costs, cfg.stress_multiplier)
     make = spec.bind(bars)
     ctx = build_context(bars)
     windows = rolling_windows([b.timestamp for b in bars], cfg)
-    results = [evaluate_window(w, bars, clean, stressed, make, spec, costs, ctx, cfg) for w in windows]
+    results = [evaluate_window(w, bars, stressed, make, spec, costs, ctx, cfg) for w in windows]
     dep, forced = stability(results, True), stability(results, False)
     ok, fails = qualify(dep, cfg)
     fok, ffails = qualify(forced, cfg)
@@ -452,6 +487,7 @@ def render(spec: HypothesisSpec, cfg: WalkForwardConfig, reports: Sequence[Symbo
     L = [
         f"# Walk-forward: {spec.name} (H1)",
         "",
+        *([f"Specification (frozen before this run): `{spec.spec_doc}`.", ""] if spec.spec_doc else []),
         f"Windows: {cfg.train_months}m train -> {cfg.validation_months}m validation -> {cfg.test_months}m test, "
         f"step {cfg.step_months}m. Train screen: >= {cfg.min_train_trades} trades and net > 0. "
         f"Validation selects (>= {cfg.min_validation_trades} trades, net > 0, else abstain). "
@@ -470,25 +506,25 @@ def render(spec: HypothesisSpec, cfg: WalkForwardConfig, reports: Sequence[Symbo
     ]
     for r in reports:
         L += [f"## {r.symbol}", "", f"Data: {r.data}.", "", "### Stability across test windows", "",
-              "| track | windows | traded | abstained | profitable | median bps | worst bps | worst total | dispersion | IQR | survive 2x | concentration | pooled trades | pooled net | pooled t | pooled 2x net |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "| track | windows | traded | abstained | profitable | median bps | worst bps | worst total | dispersion | IQR | survive 2x | concentration | pooled trades | pooled net | pooled t | pooled 2x net | pooled R |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for name, s in (("deployed", r.deployed), ("forced", r.forced)):
             L.append(
                 f"| {name} | {s.windows} | {s.traded_windows} | {s.abstained_windows} | {s.pct_profitable:.0%} | "
                 f"{s.median_window_bps:+.1f} | {s.worst_window_bps:+.1f} | {s.worst_window_total_bps:+.0f} | {s.dispersion_bps:.1f} | "
                 f"{s.iqr_bps:.1f} | {s.pct_survive_stress:.0%} | {_f(s.concentration, '.0%')} | {s.pooled_test.trades} | "
-                f"{s.pooled_test.net_bps:+.1f} | {s.pooled_test.t_stat:+.2f} | {s.pooled_test_stressed.net_bps:+.1f} |"
+                f"{s.pooled_test.net_bps:+.1f} | {s.pooled_test.t_stat:+.2f} | {s.pooled_test_stressed.net_bps:+.1f} | {_f(s.pooled_test.avg_r, '+.2f')} |"
             )
         L += ["", "### Windows (test segment of the selected parameters; forced track)", "",
-              "| # | test period | params | eligible | deployed | val net | test trades | net bps | win | avg win | avg loss | PF | t | max DD | cost bps | 2x net |",
-              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+              "| # | test period | params | eligible | deployed | val net | test trades | net bps | avg R | win | avg win | avg loss | PF | t | max DD | cost bps | 2x net |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for w in r.windows:
             t = w.test
             params = " ".join(f"{k}={v}" for k, v in w.params.items())
             dep = "yes" if w.deployed else f"no ({w.abstain_reason})"
             L.append(
                 f"| {w.index} | {w.periods['test']} | {params} | {w.eligible} | {dep} | {w.validation.net_bps:+.1f} | {t.trades} | "
-                f"{t.net_bps:+.1f} | {t.win_rate:.0%} | {t.avg_win_bps:.0f} | {t.avg_loss_bps:.0f} | {_f(t.profit_factor, '.2f')} | "
+                f"{t.net_bps:+.1f} | {_f(t.avg_r, '+.2f')} | {t.win_rate:.0%} | {t.avg_win_bps:.0f} | {t.avg_loss_bps:.0f} | {_f(t.profit_factor, '.2f')} | "
                 f"{t.t_stat:+.2f} | {t.max_drawdown_bps:.0f} | {t.cost_bps:.1f} | {w.test_stressed.net_bps:+.1f} |"
             )
         L += ["", "### Context breakdown (all forced test trades; descriptive only)", "", "| dimension | label | trades | net bps | total bps |", "|---|---|---|---|---|"]
@@ -504,8 +540,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data", default="data/mt5")
     parser.add_argument("--report", default=None)
     parser.add_argument("--json", default=None)
+    parser.add_argument("--hypothesis", default="trend_continuation", choices=sorted(HYPOTHESIS_SPECS))
     args = parser.parse_args(argv)
-    spec, cfg = trend_continuation_spec(), WalkForwardConfig()
+    spec, cfg = HYPOTHESIS_SPECS[args.hypothesis](), WalkForwardConfig()
     reports = []
     for path in sorted(Path(args.data).glob("*.csv")):
         loaded = load_mt5(path, ZoneInfo(DEFAULT_SERVER_TZ))
