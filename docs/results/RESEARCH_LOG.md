@@ -4,10 +4,48 @@ Interpretation of generated results. Files in this directory ending in `.md`/`.j
 next to an experiment are generated and must not be hand-edited; conclusions live here.
 
 Research sequence: rolling walk-forward (done) -> trend continuation (no demonstrated edge) -> liquidity sweep/reversal (no demonstrated edge; no timing edge vs drift baseline) -> volatility expansion (not qualified) -> Replication R1 of the BTCUSD long candidate (not replicated; candidate closed)
+-> FX Session Directional Persistence v1 on seven USD majors (not qualified; no demonstrated edge)
 -> volatility expansion -> regime-conditional combinations -> meta-engine
 -> portfolio/correlation -> shadow trading. No execution layer before shadow trading passes.
 
 Language rule: results say "no demonstrated edge", never "does not work".
+
+## 2026-09 - FX Session Directional Persistence v1 (seven USD majors, H1)
+
+Report: [fx_session_persistence_v1.md](fx_session_persistence_v1.md) (+ `.json`).
+
+Pre-registration trail:
+- spec frozen at `a624b64`;
+- code and tests at `4469d82`;
+- data committed at `cb533d6`. The archive sha256 was verified against the
+  frozen value before the first read. It had been quarantined unread since
+  it arrived early.
+
+**Verdict: NOT QUALIFIED. No demonstrated edge.** Every primary component fails:
+
+| component | result |
+|---|---|
+| Deployed track | abstained in all 6 windows: 5 had no train survivor, 1 had validation net <= 0 |
+| Forced track | 1,871 trades on 609 days, **-1.91 bps/trade**; day-clustered t = -1.91; 0/6 windows profitable |
+| Block drift control (forced, test) | observed -1.91 vs control -1.77 bps; **p = 0.577** |
+
+- **The gross edge is zero.** Forced-track gross (mid-to-mid) is **-0.01 bps/trade**. Costs are 1.90 bps, so the net loss is almost exactly the spread.
+  - Window gross values range from -2.3 to +1.5 bps, with no consistent sign.
+  - Early-session displacement adds nothing over random days with the same side mix at the same London clock times.
+- **The test had the resolution it was designed for.**
+  - Achieved resolution (2.8416 x the clustered SE) was **2.86 bps**, against 2.51 bps central design and 3.35-3.80 bps pessimistic. It sits within the pre-registered sensitivity range.
+  - Signalling pairs per signal day were 3.07, against 2.8 assumed.
+  - **Consequence:** this is evidence against a same-session persistence edge of about 3 bps/trade or more after costs, pooled over the seven majors, in 2023-07 to 2026-07.
+  - It is **not** evidence about smaller edges, other sessions, or other holding periods.
+- **Descriptive only, no qualification role:**
+  - Long -2.54 and short -1.25 bps.
+  - Per pair, USDJPY is +1.09 (t 0.51) and EURUSD +0.01. The rest are negative, down to NZDUSD -5.17 and USDCAD -4.39.
+  - The per-pair ordering tracks each pair's cost: NZDUSD and USDCAD are the most expensive after spread (3.30 and 2.07 bps round trip).
+  - Nothing here is a lead. Selecting a pair or a side from this table would be post-hoc selection.
+- **Exits:** 1,176 time and 695 stop, with no late time exits. No position crossed a rollover, as designed.
+- **EURUSD contamination** (its session breakdowns were seen in the trend experiment) does not affect the verdict. EURUSD was +0.01 bps, and the pooled result fails regardless.
+
+**Implication (a recommendation, not a finding):** the pooled-majors design reached its target resolution and found nothing, so the framework is now resolution-capable on FX. A further intraday-persistence variant (other sessions, other windows) should not be run just because this one failed. Each would need its own economic rationale and pre-registration, and would add to the family of tests already run on these pairs.
 
 ## 2026-09 - Statistical resolution of the completed experiments (descriptive)
 
