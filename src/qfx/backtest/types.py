@@ -26,7 +26,12 @@ class ExecutionCosts:
     spread: float = 0.0
     commission: float = 0.0
     slippage: float = 0.0
-    delay_bars: int = 0
+    delay_bars: int = 1
+
+    def __post_init__(self) -> None:
+        # A signal computed on bar i can only be filled on bar i + 1 or later.
+        if self.delay_bars < 1:
+            raise ValueError("delay_bars must be at least 1 to avoid look-ahead fills")
 
 
 @dataclass(frozen=True)
