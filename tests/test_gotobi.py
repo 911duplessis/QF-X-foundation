@@ -27,8 +27,9 @@ def closures():
 
 def test_constants_match_frozen_spec():
     s = frozen()
-    assert s["status"] == "frozen" and s["version"] == 1 and s["symbol"] == g.SYMBOL
+    assert s["status"] == "frozen" and s["version"] == 2 == g.SPEC_VERSION and s["symbol"] == g.SYMBOL
     assert s["data"]["file"] == g.CSV_NAME and s["data"]["sha256"] == g.CSV_SHA256
+    assert [x.isoformat().replace("+00:00", "Z") for x in g.DOCUMENTED_GAP] == s["data"]["documented_gap_utc"]
     c = s["calendar"]
     assert c["file"] == g.CALENDAR_PATH and c["sha256"] == g.CALENDAR_SHA256
     assert tuple(c["gotobi_days"]) == g.GOTOBI_DAYS and c["february_month_end_event"] is False
@@ -36,10 +37,13 @@ def test_constants_match_frozen_spec():
     k = s["costs"]
     assert (g.SPREAD_FLOOR, g.COMMISSION, g.STRESS) == (k["spread_floor"], k["commission"], k["stress_multiplier"])
     assert g.SLIPPAGE_RATIO == pytest.approx(k["slippage_ratio_of_floor"])
-    assert [str(d) for d in g.PRIMARY] == s["samples"]["primary"] and [str(d) for d in g.SECONDARY] == s["samples"]["secondary"]
+    sm = s["samples"]
+    assert [str(d) for d in g.PRIMARY] == sm["primary"] and [str(d) for d in g.EXCLUDED] == sm["excluded_days"]
+    assert [[str(a), str(b)] for a, b in g.SUBPERIODS] == sm["descriptive_subperiods"]
     q = s["primary"]
     assert (g.MIN_T, g.PLACEBO_MIN_T, g.MIN_YEAR_SHARE, g.MIN_YEAR_EVENTS, g.MIN_TRADES) == (
         q["min_t"], q["placebo_welch_t_min"], q["min_year_share"], q["min_year_events"], q["min_trades"])
+    assert g.MIN_T == s["power"]["t_threshold"] == 2.28 and s["ledger"]["family_size"] == 2
 
 
 def test_calendar_hash_is_enforced(tmp_path):
@@ -50,9 +54,40 @@ def test_calendar_hash_is_enforced(tmp_path):
 
 
 def test_event_counts_match_frozen_calendar_only(closures):
-    s = frozen()["power"]
-    assert len(g.gotobi_days(*g.PRIMARY, closures)) == s["calendar_events_primary"] == 519
-    assert len(g.gotobi_days(*g.SECONDARY, closures)) == s["calendar_events_secondary"] == 405
+    ex = g.EXCLUDED
+    days = [d for d in g.gotobi_days(*g.PRIMARY, closures) if not ex[0] <= d <= ex[1]]
+    assert len(days) == frozen()["power"]["calendar_events_primary"] == 498
+    years = {y: sum(1 for d in days if d.year == y) for y in range(2019, 2027)}
+    assert min(years.values()) >= g.MIN_YEAR_EVENTS  # all 8 years count
+
+
+def test_bonferroni_threshold():
+    from statistics import NormalDist
+    alpha = 1 - NormalDist().cdf(2.0)
+    assert g.MIN_T == pytest.approx(NormalDist().inv_cdf(1 - alpha / 2), abs=0.005)
+
+
+def _bar(ts):
+    return Bar(ts, 1.0, 1.0, 1.0, 1.0)
+
+
+def test_only_the_documented_gap_is_allowed():
+    a, b = g.DOCUMENTED_GAP
+    ok = [_bar(a - timedelta(hours=1)), _bar(a), _bar(b), _bar(b + timedelta(hours=1))]
+    g.check_gaps(ok)
+    extra = ok + [_bar(b + timedelta(days=10))]
+    with pytest.raises(ValueError, match="undocumented"):
+        g.check_gaps(extra)
+    with pytest.raises(ValueError, match="undocumented"):
+        g.check_gaps(ok[:2])  # the documented gap must actually be there
+
+
+def test_excluded_days_are_not_traded(closures):
+    days = _all_days(closures, date(2019, 12, 1), date(2020, 4, 30))
+    bars = sorted([b for d in days for b in bars_for([d], move_bps=3, gotobi={d})], key=lambda b: b.timestamp)
+    ev = g.evaluate(bars, (date(2019, 12, 1), date(2020, 4, 30)), closures)
+    traded = {t.entry_time.date() for t in ev.trades + ev.placebo}
+    assert traded and not any(g.EXCLUDED[0] <= d <= g.EXCLUDED[1] for d in traded)
 
 
 def test_gotobi_rules(closures):
@@ -136,18 +171,18 @@ def test_evaluate_qualifies_true_effect_and_rejects_hour_drift(closures):
             mv = (effect if d in gd else 0.0) + drift + rng.gauss(0, 6)
             out += bars_for([d], move_bps=mv, gotobi={d})
         return sorted(out, key=lambda b: b.timestamp)
-    good = g.evaluate(make(8.0, 0.0), period, closures)
+    good = g.evaluate(make(8.0, 0.0), period, closures, excluded=None)
     assert good.qualified, good.failures
     assert good.net.n == len(gd) and good.placebo_gross.n == len(days) - len(gd)
     # Same-hour drift on every day, no gotobi difference: placebo rule must fail.
-    drift = g.evaluate(make(0.0, 8.0), period, closures)
+    drift = g.evaluate(make(0.0, 8.0), period, closures, excluded=None)
     assert not drift.qualified and any("placebo" in f for f in drift.failures)
 
 
 def test_year_rule_ignores_short_stub(closures):
     period = (date(2013, 8, 26), date(2014, 12, 31))
     days = _all_days(closures, *period)
-    ev = g.evaluate(sorted([b for d in days for b in bars_for([d], move_bps=5, gotobi={d})], key=lambda b: b.timestamp), period, closures)
+    ev = g.evaluate(sorted([b for d in days for b in bars_for([d], move_bps=5, gotobi={d})], key=lambda b: b.timestamp), period, closures, excluded=None)
     assert 2013 in ev.years and 2013 not in ev.counted_years and ev.counted_years == [2014]
 
 

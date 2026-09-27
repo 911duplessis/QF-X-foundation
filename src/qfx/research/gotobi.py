@@ -7,9 +7,10 @@ drift from its JSON block).
 
 One parameter-free trade per gotobi day: long USDJPY from the open of the
 00:00 UTC bar (09:00 JST) to the open of the 01:00 UTC bar (10:00 JST).
-Qualification uses the untouched 2013-08-26..2020-12-31 sample only; the
-2021-2026 sample is descriptive. The placebo is the same trade on non-gotobi
-Japanese bank business days.
+Version 2: qualification uses all H1 data 2019-06-10..2026-09-25 (days inside
+the one documented data gap excluded) with Bonferroni-adjusted t >= 2.28 on
+both t-gates. The placebo is the same trade on non-gotobi Japanese bank
+business days.
 """
 from __future__ import annotations
 
@@ -35,6 +36,7 @@ from .walkforward import to_jsonable
 
 SPEC_PATH = "docs/hypotheses/usdjpy_gotobi_v1.md"
 SCHEMA_VERSION = 1
+SPEC_VERSION = 2
 SYMBOL = "USDJPY.m"
 CSV_NAME = "USDJPY.m_H1_201308230000_202609252300.csv"
 CSV_SHA256 = "578b734606f674bfef3ca6c8758a11335fecf2258ea550c9c15bef0f9633d05f"
@@ -44,18 +46,21 @@ CALENDAR_SHA256 = "3fc1131a9d7ea4ea7f02325b43c289cb161fa773695f96c5282814621ee40
 GOTOBI_DAYS = (5, 10, 15, 20, 25, 30)
 ENTRY_UTC = time(0, 0)
 EXIT_UTC = time(1, 0)
-PRIMARY = (date(2013, 8, 26), date(2020, 12, 31))
-SECONDARY = (date(2021, 1, 4), date(2026, 9, 25))
+PRIMARY = (date(2019, 6, 10), date(2026, 9, 25))
+EXCLUDED = (date(2019, 12, 17), date(2020, 3, 29))  # days inside the documented data gap
+SUBPERIODS = ((date(2019, 6, 10), date(2020, 12, 31)), (date(2021, 1, 4), date(2026, 9, 25)))  # descriptive
+DOCUMENTED_GAP = (datetime(2019, 12, 16, 13, tzinfo=timezone.utc), datetime(2020, 3, 29, 21, tzinfo=timezone.utc))
+MAX_GAP = timedelta(days=4)
 SPREAD_FLOOR = 0.025
 SLIPPAGE_RATIO = 1 / 6
 COMMISSION = 0.0
 STRESS = 2.0
-MIN_T = 2.0
-PLACEBO_MIN_T = 2.0
+MIN_T = 2.28  # Bonferroni, family of 2 tests on this data
+PLACEBO_MIN_T = 2.28
 MIN_YEAR_SHARE = 0.6
 MIN_YEAR_EVENTS = 30
 MIN_TRADES = 400
-MDE_MULTIPLIER = 2.0 + 0.8416
+MDE_MULTIPLIER = MIN_T + 0.8416  # detection at the qualification threshold, 80% power
 
 COSTS = ExecutionCosts(spread=SPREAD_FLOOR, slippage=SPREAD_FLOOR * SLIPPAGE_RATIO, commission=COMMISSION)
 
@@ -190,10 +195,15 @@ class Evaluation:
     failures: list[str]
 
 
-def evaluate(bars: Sequence[Bar], period: tuple[date, date], closures: frozenset[date], costs: ExecutionCosts = COSTS) -> Evaluation:
+def evaluate(bars: Sequence[Bar], period: tuple[date, date], closures: frozenset[date], costs: ExecutionCosts = COSTS,
+             excluded: tuple[date, date] | None = EXCLUDED) -> Evaluation:
     index = {b.timestamp: i for i, b in enumerate(bars)}
-    g_days = gotobi_days(*period, closures)
-    p_days = placebo_days(*period, closures, g_days)
+
+    def keep(d: date) -> bool:
+        return excluded is None or not excluded[0] <= d <= excluded[1]
+
+    g_days = [d for d in gotobi_days(*period, closures) if keep(d)]
+    p_days = [d for d in placebo_days(*period, closures, g_days) if keep(d)]
     trades = [t for d in g_days if (t := day_trade(bars, index, d, costs)) is not None]
     placebo = [t for d in p_days if (t := day_trade(bars, index, d, costs)) is not None]
     s_bars, s_costs = stressed(bars, costs)
@@ -246,18 +256,32 @@ def install_csv(src: str | Path, out_dir: str | Path = DATA_DIR, expected: str =
     return target
 
 
+def long_gaps(bars: Sequence[Bar], limit: timedelta = MAX_GAP) -> list[tuple[datetime, datetime]]:
+    return [(a.timestamp, b.timestamp) for a, b in zip(bars, bars[1:]) if b.timestamp - a.timestamp > limit]
+
+
+def check_gaps(bars: Sequence[Bar]) -> None:
+    """Only the one documented gap may exceed the frozen 4-day limit."""
+    gaps = long_gaps(bars)
+    if gaps != [DOCUMENTED_GAP]:
+        raise ValueError(f"undocumented data gaps: {gaps}")
+
+
 def load_bars(data_dir: str = DATA_DIR) -> list[Bar]:
     path = Path(data_dir) / CSV_NAME
     if sha256_file(path) != CSV_SHA256:
         raise ValueError("installed csv does not match the frozen sha256")
-    return load_mt5(path, ZoneInfo(DEFAULT_SERVER_TZ)).bars
+    span = DOCUMENTED_GAP[1] - DOCUMENTED_GAP[0]
+    bars = load_mt5(path, ZoneInfo(DEFAULT_SERVER_TZ), max_gap=span).bars
+    check_gaps(bars)
+    return bars
 
 
 def run(bars: Sequence[Bar], closures: frozenset[date] | None = None) -> dict:
     closures = closures if closures is not None else load_closures()
     primary = evaluate(bars, PRIMARY, closures)
-    secondary = evaluate(bars, SECONDARY, closures)
-    return {"primary": primary, "secondary": secondary, "qualified": primary.qualified, "failures": primary.failures,
+    subs = [evaluate(bars, p, closures) for p in SUBPERIODS]
+    return {"primary": primary, "subperiods": subs, "qualified": primary.qualified, "failures": primary.failures,
             "data": f"{len(bars)} bars, {bars[0].timestamp:%Y-%m-%d %H:%M} to {bars[-1].timestamp:%Y-%m-%d %H:%M} UTC"}
 
 
@@ -269,12 +293,13 @@ def _row(name: str, e: Evaluation) -> str:
 
 
 def render(res: dict) -> str:
-    p, s = res["primary"], res["secondary"]
+    p = res["primary"]
     L = [
         "# USDJPY Gotobi-Day Tokyo Fix v1",
         "",
-        f"Specification (frozen before this run): `{SPEC_PATH}`. Long USDJPY 00:00-01:00 UTC (09:00-10:00 JST) on gotobi days; "
-        "placebo = the same trade on non-gotobi Japanese bank business days. Qualification uses the primary sample only.",
+        f"Specification (frozen before this run, version {SPEC_VERSION}): `{SPEC_PATH}`. Long USDJPY 00:00-01:00 UTC (09:00-10:00 JST) "
+        "on gotobi days; placebo = the same trade on non-gotobi Japanese bank business days. "
+        f"Days {EXCLUDED[0]} to {EXCLUDED[1]} (data gap) excluded. Both t-gates use t >= {MIN_T} (Bonferroni, family of 2).",
         "",
         f"## Primary outcome: **{'QUALIFIED' if res['qualified'] else 'NOT QUALIFIED'}**",
         "",
@@ -283,11 +308,12 @@ def render(res: dict) -> str:
         "| sample | period | calendar events | trades | gross bps | net bps | t | placebo days | placebo gross | gotobi - placebo (gross) | Welch t | net 2x costs | positive years | median year | achieved resolution |",
         "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
         _row("primary (qualification)", p),
-        _row("secondary (descriptive only)", s),
+        *[_row(f"sub-period {i + 1} (descriptive only)", e) for i, e in enumerate(res["subperiods"])],
         "",
-        "Achieved resolution = 2.8416 x SE of net bps; descriptive only (design MDE 1.50 bps central, assumption-based).",
+        "Sub-period 1 (2019-06 to 2020) was untouched by any earlier test; sub-period 2 (2021-2026) was read by test 17 (other hours).",
+        f"Achieved resolution = {MDE_MULTIPLIER:.4f} x SE of net bps; descriptive only (design MDE 1.68 bps central at t >= 2.28, assumption-based).",
     ]
-    for name, e in (("primary", p), ("secondary", s)):
+    for name, e in (("primary", p),):
         L += ["", f"## Per year ({name}; years with < {MIN_YEAR_EVENTS} events are not counted)", "",
               "| year | trades | net bps | counted |", "|---|---|---|---|"]
         for y, v in e.years.items():
@@ -304,7 +330,8 @@ def results_json(res: dict) -> dict:
         return {k: v for k, v in e.__dict__.items() if k not in ("trades", "placebo", "stressed")}
     return to_jsonable({"schema_version": SCHEMA_VERSION, "spec": SPEC_PATH, "symbol": SYMBOL,
                         "qualified": res["qualified"], "failures": res["failures"],
-                        "primary": ev(res["primary"]), "secondary": ev(res["secondary"]), "data": res["data"]})
+                        "spec_version": SPEC_VERSION, "primary": ev(res["primary"]),
+                        "subperiods": [ev(e) for e in res["subperiods"]], "data": res["data"]})
 
 
 def main(argv: list[str] | None = None) -> int:
