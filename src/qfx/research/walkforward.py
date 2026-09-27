@@ -168,11 +168,13 @@ def add_months(dt: datetime, months: int) -> datetime:
     return dt.replace(year=year, month=month, day=min(dt.day, days[month - 1]))
 
 
-def rolling_windows(timestamps: Sequence[datetime], cfg: WalkForwardConfig) -> list[Window]:
-    """Contiguous, non-overlapping test windows stepping through time."""
+def rolling_windows(timestamps: Sequence[datetime], cfg: WalkForwardConfig, origin: datetime | None = None) -> list[Window]:
+    """Contiguous, non-overlapping test windows stepping through time.
+    ``origin`` fixes a common calendar start across instruments (default:
+    the first timestamp)."""
     if not timestamps:
         return []
-    origin, last = timestamps[0], timestamps[-1]
+    origin, last = (origin or timestamps[0]), timestamps[-1]
     windows: list[Window] = []
     k = 0
     while True:
@@ -441,12 +443,17 @@ def merge_breakdowns(results: Sequence[WindowResult]) -> dict:
 
 
 def run_walkforward(
-    symbol: str, bars: Sequence[Bar], spec: HypothesisSpec, costs: ExecutionCosts, cfg: WalkForwardConfig = WalkForwardConfig()
+    symbol: str,
+    bars: Sequence[Bar],
+    spec: HypothesisSpec,
+    costs: ExecutionCosts,
+    cfg: WalkForwardConfig = WalkForwardConfig(),
+    origin: datetime | None = None,
 ) -> SymbolReport:
     stressed = stress(bars, costs, cfg.stress_multiplier)
     make = spec.bind(bars)
     ctx = build_context(bars)
-    windows = rolling_windows([b.timestamp for b in bars], cfg)
+    windows = rolling_windows([b.timestamp for b in bars], cfg, origin)
     results = [evaluate_window(w, bars, stressed, make, spec, costs, ctx, cfg) for w in windows]
     dep, forced = stability(results, True), stability(results, False)
     ok, fails = qualify(dep, cfg)

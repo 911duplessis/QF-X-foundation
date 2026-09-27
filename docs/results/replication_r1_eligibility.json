@@ -1,0 +1,256 @@
+[
+  {
+    "symbol": "SOLUSD.m",
+    "file": "05569afc-SOLUSD.m_H1_202208150000_202609270000.csv",
+    "sha256": "9c3a1b9da48e71a7406dc3bbe57220577b87932e7eda8203deea058703e418f2",
+    "eligible": false,
+    "reasons": [
+      "first H1 2022-08-14 21:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 33086,
+    "first_h1_utc": "2022-08-14T21:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 3,
+    "gap_count": 68,
+    "max_gap_hours": 73.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "DOTUSD.m",
+    "file": "2d1cdb68-DOTUSD.m_H1_202206200000_202609270000.csv",
+    "sha256": "40450db1196c3447297615cebafc1ade4b75110b380f7ad9d843d2fc72e8bac3",
+    "eligible": false,
+    "reasons": [
+      "first H1 2022-06-19 21:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 34047,
+    "first_h1_utc": "2022-06-19T21:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 3,
+    "gap_count": 76,
+    "max_gap_hours": 73.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "XLMUSD.m",
+    "file": "3a0261a1-XLMUSD.m_H1_202206200000_202609270000.csv",
+    "sha256": "e90aa2dbe803b5291aa5ac95ae0d960d67b06cc7faf2ec2551629516003f60e7",
+    "eligible": false,
+    "reasons": [
+      "first H1 2022-06-19 21:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 34048,
+    "first_h1_utc": "2022-06-19T21:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 3,
+    "gap_count": 75,
+    "max_gap_hours": 73.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "LTCUSD.m",
+    "file": "489ddd5b-LTCUSD.m_H1_202101010000_202609270000.csv",
+    "sha256": "c9119d5d28d4c28e64d81d5ec3504cfc96cd6038f32abc4fc18accd4969891df",
+    "eligible": true,
+    "reasons": [],
+    "bars": 50200,
+    "first_h1_utc": "2020-12-31T22:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 6,
+    "gap_count": 52,
+    "max_gap_hours": 9.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "ADAUSD.m",
+    "file": "8821d095-ADAUSD.m_H1_202206200000_202609270000.csv",
+    "sha256": "8348ce2c1b3cfdf1b679d6cf02460c01c5c267b30ce83e23342da8fac85e294c",
+    "eligible": false,
+    "reasons": [
+      "first H1 2022-06-19 21:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 34048,
+    "first_h1_utc": "2022-06-19T21:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 3,
+    "gap_count": 75,
+    "max_gap_hours": 73.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "ETHUSD.m",
+    "file": "8a2cf904-ETHUSD.m_H1_202101010000_202609270000.csv",
+    "sha256": "bc251b7f0cfabd762f0b2bfd5dd71aab5850a90920fb8bfe674584cc888dfc12",
+    "eligible": true,
+    "reasons": [],
+    "bars": 50196,
+    "first_h1_utc": "2020-12-31T22:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 6,
+    "gap_count": 55,
+    "max_gap_hours": 9.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "KSMUSD.m",
+    "file": "969526ea-KSMUSD.m_H1_202208150000_202609270000.csv",
+    "sha256": "80035fd405d9a6715ee9efbf9f6d93e855839fa21bc7c9562d54b98cad8c9844",
+    "eligible": false,
+    "reasons": [
+      "first H1 2022-08-14 21:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 33088,
+    "first_h1_utc": "2022-08-14T21:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 3,
+    "gap_count": 67,
+    "max_gap_hours": 73.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "TRXUSD.m",
+    "file": "da0444b3-TRXUSD.m_H1_202402061100_202609270000.csv",
+    "sha256": "082f35094a5a932ea6fd5c275bb59b0b6be4f2e6a2bdd0f3c577235978b7a33c",
+    "eligible": false,
+    "reasons": [
+      "first H1 2024-02-06 09:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 23118,
+    "first_h1_utc": "2024-02-06T09:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 3,
+    "gap_count": 5,
+    "max_gap_hours": 4.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "XRPUSD.m",
+    "file": "ea365e02-XRPUSD.m_H1_202101010000_202609270000.csv",
+    "sha256": "985fa84fb00e602d631d8323b60ff6aa83868dcd8285e199a9112c6021744e10",
+    "eligible": true,
+    "reasons": [],
+    "bars": 50200,
+    "first_h1_utc": "2020-12-31T22:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 6,
+    "gap_count": 52,
+    "max_gap_hours": 9.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "AVAXUSD.m",
+    "file": "AVAXUSD.m_H1_202402061100_202609270000.csv",
+    "sha256": "90eba55ecade9f88ed255ae467f53c462c896f502858909bf8444501bc4709f6",
+    "eligible": false,
+    "reasons": [
+      "first H1 2024-02-06 09:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 23118,
+    "first_h1_utc": "2024-02-06T09:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 3,
+    "gap_count": 5,
+    "max_gap_hours": 4.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "BCHUSD.m",
+    "file": "BCHUSD.m_H1_202101010000_202609270000.csv",
+    "sha256": "27535e836949e8b4014df7488a05ac97a348ba3f1c3520419635d93ca8c94ad8",
+    "eligible": false,
+    "reasons": [
+      "gate0 failed"
+    ],
+    "bars": 50180,
+    "first_h1_utc": "2020-12-31T22:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 6,
+    "gap_count": 61,
+    "max_gap_hours": 9.0,
+    "gate0_issues": [
+      "resolution_change@878"
+    ]
+  },
+  {
+    "symbol": "DOGEUSD.m",
+    "file": "DOGEUSD.m_H1_202206200000_202609270000.csv",
+    "sha256": "4ac1f8ed23dd84a62deb24e571b24675b1c5095076fb0b98100582b14448e8df",
+    "eligible": false,
+    "reasons": [
+      "first H1 2022-06-19 21:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 34048,
+    "first_h1_utc": "2022-06-19T21:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 3,
+    "gap_count": 75,
+    "max_gap_hours": 73.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "LINKUSD.m",
+    "file": "LINKUSD.m_H1_202206200000_202609270000.csv",
+    "sha256": "57a3f5d76b0410107a03466021d22bbaa9b21efbfb8876184792aaf14cd8f1e6",
+    "eligible": false,
+    "reasons": [
+      "gate0 failed",
+      "first H1 2022-06-19 21:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 9170,
+    "first_h1_utc": "2022-06-19T21:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 1,
+    "gap_count": 25,
+    "max_gap_hours": 27117.0,
+    "gate0_issues": [
+      "gap_exceeds_max@2898:1129 days, 21:00:00"
+    ]
+  },
+  {
+    "symbol": "MATICUSD.m",
+    "file": "MATICUSD.m_H1_202208152200_202609270000.csv",
+    "sha256": "3cb21263219ace22be3388e18b19a92f1ce2b247316f2dde4b7f40e80af21f09",
+    "eligible": false,
+    "reasons": [
+      "first H1 2022-08-15 19:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 33060,
+    "first_h1_utc": "2022-08-15T19:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 3,
+    "gap_count": 71,
+    "max_gap_hours": 73.0,
+    "gate0_issues": []
+  },
+  {
+    "symbol": "UNIUSD.m",
+    "file": "UNIUSD.m_H1_202402061100_202609270000.csv",
+    "sha256": "1bbefb637f443045e8c0225067b33ceae9da2de2af98229de609836ec848135c",
+    "eligible": false,
+    "reasons": [
+      "first H1 2024-02-06 09:00:00+00:00 after 2021-01-01 00:00:00+00:00"
+    ],
+    "bars": 23118,
+    "first_h1_utc": "2024-02-06T09:00:00+00:00",
+    "last_h1_utc": "2026-09-26T21:00:00+00:00",
+    "trimmed_prefix": 0,
+    "dst_collisions_dropped": 2,
+    "gap_count": 5,
+    "max_gap_hours": 4.0,
+    "gate0_issues": []
+  }
+]
