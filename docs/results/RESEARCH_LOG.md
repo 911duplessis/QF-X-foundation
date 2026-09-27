@@ -40,7 +40,8 @@ Pre-registration trail:
 - **Descriptive only, no qualification role:**
   - Long -2.54 and short -1.25 bps.
   - Per pair, USDJPY is +1.09 (t 0.51) and EURUSD +0.01. The rest are negative, down to NZDUSD -5.17 and USDCAD -4.39.
-  - The per-pair ordering tracks each pair's cost: NZDUSD and USDCAD are the most expensive after spread (3.30 and 2.07 bps round trip).
+  - The per-pair ordering does **not** track cost: USDJPY is among the most expensive pairs yet positive, and AUDUSD is cheap yet negative.
+  - The largest deviation is USDCAD at -4.39 bps (t -3.69). Among 7 pairs, one tail result is not a lead in either direction. Reading it as reversal would be the same post-hoc selection.
   - Nothing here is a lead. Selecting a pair or a side from this table would be post-hoc selection.
 - **Exits:** 1,176 time and 695 stop, with no late time exits. No position crossed a rollover, as designed.
 - **EURUSD contamination** (its session breakdowns were seen in the trend experiment) does not affect the verdict. EURUSD was +0.01 bps, and the pooled result fails regardless.
