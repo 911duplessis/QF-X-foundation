@@ -10,6 +10,8 @@ Research sequence: rolling walk-forward (done) -> trend continuation (no demonst
 
 Language rule: results say "no demonstrated edge", never "does not work".
 
+Every primary test is also listed in the [test ledger](../hypotheses/TEST_LEDGER.md) (17 tests, 0 qualified). A new pre-registration must include a ledger section: overlap, family size and multiplicity handling.
+
 ## 2026-09 - FX Session Directional Persistence v1 (seven USD majors, H1)
 
 Report: [fx_session_persistence_v1.md](fx_session_persistence_v1.md) (+ `.json`).
