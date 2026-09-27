@@ -7,3 +7,6 @@ risk:
   martingale: false
   uncontrolled_averaging_down: false
   unbounded_pyramiding: false
+  max_drawdown: 0.06
+  max_consecutive_losses: 4
+  correlation_threshold: 0.7
